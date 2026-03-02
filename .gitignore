@@ -1,0 +1,78 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Logs
+*.log
+
+# SQLite
+*.db
+
+# Alembic
+alembic/versions/*.pyc
+
+# =========================
+# FastAPI / Uvicorn
+# =========================
+*.pid
+*.sock
+
+# =========================
+# Node / React / Vite
+# =========================
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# =========================
+# Docker
+# =========================
+*.tar
+docker-compose.override.yml
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =========================
+# Misc
+# =========================
+*.bak
+*.tmp
