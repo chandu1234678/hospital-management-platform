@@ -6,6 +6,11 @@ __pycache__/
 *.pyd
 *.log
 .env
+*.env
+
+# Logs
+logs/
+*.log
 
 # OS
 .DS_Store
@@ -17,3 +22,10 @@ Thumbs.db
 
 # Node
 node_modules/
+npm-debug.log*
+
+# Vite build output — do not push dist
+frontend/dist/
+
+# Docker
+docker-compose.override.yml

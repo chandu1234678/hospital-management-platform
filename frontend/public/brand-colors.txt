@@ -1,0 +1,17 @@
+Deepthi Hospitals — Brand Colors
+=================================
+
+Primary Medical Blue : #0F4C81
+Healthcare Teal      : #2EC4B6
+Light Background     : #F7FAFC
+Accent Green         : #22C55E
+Emergency Red        : #EF4444
+Text Dark            : #111827
+
+Logo Assets
+-----------
+/logo.svg          — Horizontal logo (light backgrounds)
+/logo-dark.svg     — Horizontal logo (navy background)
+/logo-white.svg    — Horizontal logo (black background)
+/logo-icon.svg     — Square app icon 192×192 (navy bg, rounded)
+/favicon.svg       — Favicon 32×32
