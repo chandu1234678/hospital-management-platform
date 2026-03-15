@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import toast from 'react-hot-toast'
 import Logo from '../../components/Logo.jsx'
 import BackButton from '../../components/BackButton.jsx'
+import { authService } from '../../services/api.js'
 
 const schema = z.object({
   email: z.string().min(1, 'Email or ID is required'),
@@ -60,12 +61,15 @@ export default function HmsLoginPage({ role = 'admin' }) {
 
   const onSubmit = async (data) => {
     setLoading(true)
-    await new Promise(r => setTimeout(r, 700))
-    if (data.email.trim() === config.credentials.email && data.password.trim() === config.credentials.password) {
+    try {
+      const user = await authService.login(data.email.trim(), data.password.trim())
+      // Store token for HMS portal use
+      localStorage.setItem('hms-token', user.token)
+      localStorage.setItem('hms-user', JSON.stringify(user))
       toast.success(`Welcome to ${config.title}!`)
       navigate(config.redirect)
-    } else {
-      toast.error(`Invalid credentials. Use: ${config.demo}`)
+    } catch (err) {
+      toast.error(err.message || `Invalid credentials. Demo: ${config.demo}`)
     }
     setLoading(false)
   }

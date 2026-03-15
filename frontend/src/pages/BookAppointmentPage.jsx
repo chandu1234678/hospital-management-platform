@@ -9,7 +9,7 @@ import Footer from '../components/Footer.jsx'
 import BackButton from '../components/BackButton.jsx'
 import { DEPARTMENTS, DOCTORS } from '../data/mockData.js'
 import { useAppointmentStore } from '../store/appointmentStore.js'
-import { appointmentService } from '../services/api.js'
+import { appointmentService, patientService, doctorService } from '../services/api.js'
 
 const STEPS = ['Department', 'Doctor', 'Date & Time', 'Patient Details', 'Confirm']
 
@@ -63,21 +63,65 @@ export default function BookAppointmentPage() {
 
   const onConfirm = async (data) => {
     setLoading(true)
-    const appt = {
-      id: `APT-${Date.now()}`,
-      doctorId: selectedDoctor.id,
-      doctorName: selectedDoctor.name,
-      department: selectedDept,
-      date: selectedDate,
-      time: selectedSlot,
-      location: selectedDoctor.location,
-      fee: selectedDoctor.fee,
-      status: 'upcoming',
-      paymentStatus: 'unpaid',
-      patientName: data.patientName,
-      reason: data.reason,
+    try {
+      // Resolve real DB IDs
+      let patientId = null
+      let realDoctorId = selectedDoctor.id
+
+      try {
+        const profile = await patientService.getProfile()
+        patientId = profile?.id || null
+      } catch (_) { /* not logged in or no profile — will use null */ }
+
+      // Try to find the matching doctor in the DB by name
+      try {
+        const dbDoctors = await doctorService.getAll({ department: selectedDept })
+        const match = dbDoctors.find(d =>
+          d.name?.toLowerCase() === selectedDoctor.name?.toLowerCase() ||
+          d.specialty?.toLowerCase() === selectedDoctor.specialty?.toLowerCase()
+        )
+        if (match) realDoctorId = match.id
+      } catch (_) { /* fallback to mock id */ }
+
+      // Build local appt object for store/UI
+      const appt = {
+        id: `APT-${Date.now()}`,
+        doctorId: realDoctorId,
+        doctorName: selectedDoctor.name,
+        department: selectedDept,
+        date: selectedDate,
+        time: selectedSlot,
+        location: selectedDoctor.location,
+        fee: selectedDoctor.fee,
+        status: 'upcoming',
+        paymentStatus: 'unpaid',
+        patientName: data.patientName,
+        reason: data.reason,
+      }
+
+      // Save to backend if we have patient_id and doctor_id
+      if (patientId && realDoctorId) {
+        try {
+          const saved = await appointmentService.book({
+            patient_id: patientId,
+            doctor_id: realDoctorId,
+            appointment_date: selectedDate,
+            appointment_time: selectedSlot,
+            department: selectedDept,
+            reason: data.reason,
+          })
+          appt.id = saved.id || appt.id
+          appt.backendId = saved.id
+        } catch (err) {
+          console.warn('Backend booking failed, continuing with local:', err)
+        }
+      }
+
+      openRazorpayCheckout(appt, data, null)
+    } catch (err) {
+      setLoading(false)
+      toast.error('Something went wrong. Please try again.')
     }
-    openRazorpayCheckout(appt, data, null)
   }
 
   const openRazorpayCheckout = (appt, formData, savedOrder) => {

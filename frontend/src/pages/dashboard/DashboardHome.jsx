@@ -1,19 +1,28 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthStore } from '../../store/authStore.js'
 import { useAppointmentStore } from '../../store/appointmentStore.js'
-import { MOCK_PRESCRIPTIONS, MOCK_LAB_REPORTS, MOCK_MESSAGES } from '../../data/mockData.js'
+import { prescriptionService, reportService } from '../../services/api.js'
+import { MOCK_MESSAGES } from '../../data/mockData.js'
 
 export default function DashboardHome() {
   const { user } = useAuthStore()
   const { appointments } = useAppointmentStore()
+  const [prescriptions, setPrescriptions] = useState([])
+  const [labReports, setLabReports] = useState([])
+
+  useEffect(() => {
+    prescriptionService.getAll().then(setPrescriptions).catch(() => {})
+    reportService.getAll().then(setLabReports).catch(() => {})
+  }, [])
+
   const upcoming = appointments.filter(a => a.status === 'upcoming')
-  const activeMeds = MOCK_PRESCRIPTIONS.filter(p => p.status === 'active')
-  const pendingReports = MOCK_LAB_REPORTS.filter(r => r.status === 'processing')
+  const activeMeds = prescriptions.filter(p => p.status === 'active')
+  const pendingReports = labReports.filter(r => r.status === 'processing')
   const unreadMsgs = MOCK_MESSAGES.filter(m => !m.read)
 
   return (
     <div className="p-6 md:p-8">
-      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Welcome back, {user?.name?.split(' ')[0]}</h2>
@@ -26,7 +35,6 @@ export default function DashboardHome() {
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         {[
           { icon: 'event', color: 'text-[#0f4b80] bg-[#0f4b80]/10', label: 'Next Appointment', value: upcoming[0] ? `${upcoming[0].date} ${upcoming[0].time}` : 'None scheduled' },
@@ -47,7 +55,6 @@ export default function DashboardHome() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left */}
         <div className="lg:col-span-2 space-y-8">
           {/* Upcoming Appointments */}
           <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -78,9 +85,7 @@ export default function DashboardHome() {
                       <span className="material-symbols-outlined text-xs">location_on</span>{appt.location}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Link to="/dashboard/appointments" className="px-3 py-1.5 bg-[#0f4b80] text-white text-xs font-medium rounded-lg hover:opacity-90">Manage</Link>
-                  </div>
+                  <Link to="/dashboard/appointments" className="px-3 py-1.5 bg-[#0f4b80] text-white text-xs font-medium rounded-lg hover:opacity-90">Manage</Link>
                 </div>
               ))}
             </div>
@@ -96,7 +101,12 @@ export default function DashboardHome() {
               <Link to="/dashboard/prescriptions" className="text-[#0f4b80] text-sm font-semibold hover:underline">View All</Link>
             </div>
             <div className="divide-y divide-slate-100">
-              {activeMeds.slice(0, 2).map(rx => (
+              {activeMeds.length === 0 ? (
+                <div className="p-6 text-center text-slate-400">
+                  <span className="material-symbols-outlined text-3xl">medication</span>
+                  <p className="text-sm mt-1">No active prescriptions</p>
+                </div>
+              ) : activeMeds.slice(0, 2).map(rx => (
                 <div key={rx.id} className="p-5 flex justify-between items-center">
                   <div className="flex gap-4">
                     <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center">
@@ -117,7 +127,6 @@ export default function DashboardHome() {
           </section>
         </div>
 
-        {/* Right */}
         <div className="space-y-8">
           {/* Lab Reports */}
           <section className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -128,7 +137,12 @@ export default function DashboardHome() {
               </h3>
             </div>
             <div className="p-4 space-y-3">
-              {MOCK_LAB_REPORTS.slice(0, 3).map(r => (
+              {labReports.length === 0 ? (
+                <div className="text-center py-4 text-slate-400">
+                  <span className="material-symbols-outlined text-3xl">lab_profile</span>
+                  <p className="text-sm mt-1">No lab reports</p>
+                </div>
+              ) : labReports.slice(0, 3).map(r => (
                 <Link key={r.id} to="/dashboard/lab-reports"
                   className={`block p-4 border rounded-lg hover:bg-slate-50 cursor-pointer group transition-colors ${r.status === 'processing' ? 'bg-amber-50/50 border-amber-100' : 'border-slate-100'}`}>
                   <div className="flex justify-between items-start mb-1">

@@ -1,10 +1,10 @@
-// API service — uses real backend when VITE_API_URL is set, falls back to mock
+// API service — real backend via VITE_API_URL, mock fallback
 import { MOCK_CREDENTIALS, MOCK_USER, DOCTORS, MOCK_APPOINTMENTS, MOCK_PRESCRIPTIONS, MOCK_LAB_REPORTS } from '../data/mockData.js'
 
 const BASE_URL = import.meta.env.VITE_API_URL || null
 const delay = (ms = 600) => new Promise(r => setTimeout(r, ms))
 
-// ─── HTTP helper ────────────────────────────────────────────────────────────
+// ─── HTTP helper ─────────────────────────────────────────────────────────────
 async function http(method, path, body, token) {
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -25,7 +25,13 @@ const getToken = () => {
   } catch { return null }
 }
 
-// ─── Auth ────────────────────────────────────────────────────────────────────
+const getHmsToken = () => {
+  try {
+    return localStorage.getItem('hms-token') || getToken()
+  } catch { return null }
+}
+
+// ─── Auth ─────────────────────────────────────────────────────────────────────
 export const authService = {
   async login(identifier, password) {
     if (BASE_URL) {
@@ -33,7 +39,6 @@ export const authService = {
       const me = await http('GET', '/auth/me', null, data.access_token)
       return { ...me, token: data.access_token, refresh_token: data.refresh_token }
     }
-    // mock fallback
     await delay()
     const found = MOCK_CREDENTIALS.find(
       c => (c.email === identifier || c.phone === identifier) && c.password === password
@@ -44,7 +49,7 @@ export const authService = {
 
   async register(data) {
     if (BASE_URL) {
-      const res = await http('POST', '/auth/register', { ...data, role: 'PATIENT' })
+      await http('POST', '/auth/register', { ...data, role: 'PATIENT' })
       const login = await http('POST', '/auth/login', { email: data.email, password: data.password })
       const me = await http('GET', '/auth/me', null, login.access_token)
       return { ...me, token: login.access_token }
@@ -53,7 +58,7 @@ export const authService = {
     return { ...MOCK_USER, ...data, token: 'mock-jwt-token' }
   },
 
-  async sendOtp(contact) {
+  async sendOtp(_contact) {
     await delay(500)
     return { success: true }
   },
@@ -65,7 +70,7 @@ export const authService = {
   },
 }
 
-// ─── Doctors ─────────────────────────────────────────────────────────────────
+// ─── Doctors ──────────────────────────────────────────────────────────────────
 export const doctorService = {
   async getAll(filters = {}) {
     if (BASE_URL) {
@@ -102,7 +107,14 @@ export const appointmentService = {
 
   async getAll(filters = {}) {
     if (BASE_URL) {
-      const params = new URLSearchParams(filters)
+      let f = { ...filters }
+      if (!f.patient_id) {
+        try {
+          const profile = await http('GET', '/patients/me', null, getToken())
+          if (profile?.id) f.patient_id = profile.id
+        } catch (_) {}
+      }
+      const params = new URLSearchParams(f)
       return http('GET', `/appointments?${params}`, null, getToken())
     }
     await delay()
@@ -127,13 +139,40 @@ export const appointmentService = {
 // ─── Patient profile ──────────────────────────────────────────────────────────
 export const patientService = {
   async getProfile() {
-    if (BASE_URL) return http('GET', '/patients/me', null, getToken())
+    if (BASE_URL) {
+      const p = await http('GET', '/patients/me', null, getToken())
+      return {
+        ...p,
+        bloodGroup: p.blood_group,
+        emergencyContact: p.emergency_contact,
+        dateOfBirth: p.date_of_birth,
+        medicalHistory: p.medical_history,
+      }
+    }
     await delay(400)
     return JSON.parse(localStorage.getItem('patientProfile') || JSON.stringify(MOCK_USER))
   },
 
   async updateProfile(data) {
-    if (BASE_URL) return http('PATCH', '/patients/me', data, getToken())
+    if (BASE_URL) {
+      const payload = {
+        blood_group: data.bloodGroup || data.blood_group,
+        emergency_contact: data.emergencyContact || data.emergency_contact,
+        date_of_birth: data.dateOfBirth || data.date_of_birth,
+        address: data.address,
+        allergies: data.allergies,
+        medical_history: data.medicalHistory || data.medical_history || data.medications,
+        gender: data.gender,
+      }
+      const p = await http('PATCH', '/patients/me', payload, getToken())
+      return {
+        ...p,
+        bloodGroup: p.blood_group,
+        emergencyContact: p.emergency_contact,
+        dateOfBirth: p.date_of_birth,
+        medicalHistory: p.medical_history,
+      }
+    }
     await delay(600)
     const updated = { ...MOCK_USER, ...data }
     localStorage.setItem('patientProfile', JSON.stringify(updated))
@@ -144,7 +183,23 @@ export const patientService = {
 // ─── Lab reports ──────────────────────────────────────────────────────────────
 export const reportService = {
   async getAll() {
-    if (BASE_URL) return http('GET', '/lab-reports', null, getToken())
+    if (BASE_URL) {
+      let patientId = null
+      try {
+        const profile = await http('GET', '/patients/me', null, getToken())
+        patientId = profile?.id
+      } catch (_) {}
+      const params = patientId ? `?patient_id=${patientId}` : ''
+      const reports = await http('GET', `/lab-reports${params}`, null, getToken())
+      return reports.map(r => ({
+        ...r,
+        name: r.test_name,
+        type: r.test_type || 'General',
+        date: r.report_date || new Date(r.created_at).toLocaleDateString('en-IN'),
+        doctor: r.doctor_name || (r.doctor_id ? `Dr. #${r.doctor_id}` : 'N/A'),
+        status: r.status === 'COMPLETED' ? 'ready' : 'processing',
+      }))
+    }
     await delay()
     return MOCK_LAB_REPORTS
   },
@@ -166,7 +221,31 @@ export const reportService = {
 // ─── Prescriptions ────────────────────────────────────────────────────────────
 export const prescriptionService = {
   async getAll() {
-    if (BASE_URL) return http('GET', '/prescriptions', null, getToken())
+    if (BASE_URL) {
+      let patientId = null
+      try {
+        const profile = await http('GET', '/patients/me', null, getToken())
+        patientId = profile?.id
+      } catch (_) {}
+      const params = patientId ? `?patient_id=${patientId}` : ''
+      const rxList = await http('GET', `/prescriptions${params}`, null, getToken())
+      return rxList.map(rx => {
+        let meds = []
+        try { meds = JSON.parse(rx.medications) } catch (_) {}
+        const firstMed = Array.isArray(meds) && meds.length > 0 ? meds[0] : {}
+        return {
+          ...rx,
+          medicine: firstMed.name || rx.diagnosis || 'Prescription',
+          dosage: firstMed.dosage || firstMed.dose || '',
+          form: firstMed.form || firstMed.type || 'Tablet',
+          doctor: rx.doctor_id ? `Dr. #${rx.doctor_id}` : 'N/A',
+          instructions: rx.instructions || firstMed.instructions || '',
+          refills: firstMed.refills ?? 0,
+          status: rx.status === 'ACTIVE' ? 'active' : 'expired',
+          date: new Date(rx.created_at).toLocaleDateString('en-IN'),
+        }
+      })
+    }
     await delay()
     return MOCK_PRESCRIPTIONS
   },
@@ -175,7 +254,30 @@ export const prescriptionService = {
 // ─── Billing ──────────────────────────────────────────────────────────────────
 export const billingService = {
   async getAll() {
-    if (BASE_URL) return http('GET', '/billing', null, getToken())
+    if (BASE_URL) {
+      let patientId = null
+      try {
+        const profile = await http('GET', '/patients/me', null, getToken())
+        patientId = profile?.id
+      } catch (_) {}
+      const params = patientId ? `?patient_id=${patientId}` : ''
+      const bills = await http('GET', `/billing${params}`, null, getToken())
+      return bills.map(b => {
+        let items = []
+        try { items = JSON.parse(b.items) } catch (_) {}
+        const desc = items.length > 0 ? items.map(i => i.name).join(', ') : 'Medical Services'
+        return {
+          ...b,
+          invoiceId: b.bill_number,
+          date: new Date(b.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+          desc,
+          amount: b.total,
+          status: b.status === 'PAID' ? 'Paid' : b.status === 'PARTIAL' ? 'Partial' : 'Pending',
+          paymentId: null,
+          paidOn: b.paid_at ? new Date(b.paid_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : null,
+        }
+      })
+    }
     await delay()
     return []
   },
@@ -192,8 +294,53 @@ export const billingService = {
 // ─── Admin stats ──────────────────────────────────────────────────────────────
 export const adminService = {
   async getStats() {
-    if (BASE_URL) return http('GET', '/admin/stats', null, getToken())
+    if (BASE_URL) return http('GET', '/admin/stats', null, getHmsToken())
     await delay(400)
     return { total_patients: 0, total_doctors: 0, total_appointments: 0, today_appointments: 0, available_beds: 0, total_beds: 0, pending_bills: 0, total_revenue: 0 }
+  },
+}
+
+// ─── HMS services (admin + doctor portal) ────────────────────────────────────
+export const hmsService = {
+  // Admin
+  async getAppointments() {
+    if (BASE_URL) return http('GET', '/admin/appointments', null, getHmsToken())
+    return []
+  },
+
+  async getPatients() {
+    if (BASE_URL) return http('GET', '/admin/patients', null, getHmsToken())
+    return []
+  },
+
+  async getBilling() {
+    if (BASE_URL) return http('GET', '/admin/billing', null, getHmsToken())
+    return []
+  },
+
+  async getLabQueue() {
+    if (BASE_URL) return http('GET', '/admin/lab', null, getHmsToken())
+    return []
+  },
+
+  async getInventory() {
+    if (BASE_URL) return http('GET', '/inventory', null, getHmsToken())
+    return []
+  },
+
+  async getBeds() {
+    if (BASE_URL) return http('GET', '/beds', null, getHmsToken())
+    return []
+  },
+
+  // Doctor portal
+  async getDoctorAppointments() {
+    if (BASE_URL) return http('GET', '/doctors/me/appointments', null, getHmsToken())
+    return []
+  },
+
+  async getDoctorPatients() {
+    if (BASE_URL) return http('GET', '/doctors/me/patients', null, getHmsToken())
+    return []
   },
 }

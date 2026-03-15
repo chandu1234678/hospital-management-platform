@@ -108,6 +108,7 @@ export function downloadInvoice({ invoiceId, date, description, amount, status, 
 </html>`
 
   const iframe = document.createElement('iframe')
+
   iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;height:1000px;'
   document.body.appendChild(iframe)
   iframe.contentDocument.open()
@@ -119,3 +120,6 @@ export function downloadInvoice({ invoiceId, date, description, amount, status, 
     setTimeout(() => document.body.removeChild(iframe), 1000)
   }, 300)
 }
+
+// Alias for backwards compatibility and tests
+export const generateInvoice = downloadInvoice

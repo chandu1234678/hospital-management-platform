@@ -241,3 +241,5 @@ If something is not working feel free to open an issue or check the logs in `bac
 venv\Scripts\python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 npm run dev
 C:\Users\bc833\Downloads\ngrok-v3-stable-windows-amd64\ngrok.exe http 8000
+venv\Scripts\activate
+ venv\Scripts\ngrok http 8000

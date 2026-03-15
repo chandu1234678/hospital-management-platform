@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { HMS_STATS, HMS_RECENT_ADMISSIONS, HMS_ALERTS } from '../../../data/hmsData.js'
+import { adminService } from '../../../services/api.js'
+import { HMS_RECENT_ADMISSIONS, HMS_ALERTS } from '../../../data/hmsData.js'
 
 const STATUS_COLORS = {
   Critical: 'bg-amber-100 text-amber-700',
@@ -14,20 +15,23 @@ const ALERT_STYLES = {
   blue: { bg: 'bg-blue-50 border-blue-500', title: 'text-blue-800', desc: 'text-blue-700', time: 'text-blue-500' },
 }
 
-const ICON_COLORS = {
-  red: 'text-red-600', amber: 'text-amber-600', blue: 'text-blue-600',
-}
+const ICON_COLORS = { red: 'text-red-600', amber: 'text-amber-600', blue: 'text-blue-600' }
 
 export default function AdminDashboard() {
   const [alerts, setAlerts] = useState(HMS_ALERTS)
   const [chartPeriod, setChartPeriod] = useState('Last 7 Days')
+  const [dbStats, setDbStats] = useState(null)
+
+  useEffect(() => {
+    adminService.getStats().then(setDbStats).catch(() => {})
+  }, [])
 
   const stats = [
-    { label: 'Total Patients', value: HMS_STATS.totalPatients.toLocaleString(), icon: 'group', color: 'bg-[#0f4b80]/10 text-[#0f4b80]', trend: '+5.2%', trendLabel: 'from last month', up: true },
-    { label: 'Appointments', value: HMS_STATS.appointmentsToday, icon: 'event_note', color: 'bg-blue-100 text-blue-600', trend: '+12%', trendLabel: 'expected today', up: true },
-    { label: 'Doctors Available', value: HMS_STATS.doctorsAvailable, icon: 'medical_information', color: 'bg-indigo-100 text-indigo-600', trend: '3 On leave', trendLabel: 'today', up: null },
-    { label: 'Revenue Today', value: HMS_STATS.revenueToday, icon: 'payments', color: 'bg-emerald-100 text-emerald-600', trend: '-2.4%', trendLabel: 'vs yesterday', up: false },
-    { label: 'Bed Occupancy', value: HMS_STATS.bedOccupancy, icon: 'bed', color: 'bg-amber-100 text-amber-600', trend: '+8%', trendLabel: 'High demand', up: true },
+    { label: 'Total Patients', value: dbStats ? dbStats.total_patients.toLocaleString() : '—', icon: 'group', color: 'bg-[#0f4b80]/10 text-[#0f4b80]', trend: 'Registered patients', up: null },
+    { label: "Today's Appointments", value: dbStats ? dbStats.today_appointments : '—', icon: 'event_note', color: 'bg-blue-100 text-blue-600', trend: 'Scheduled today', up: null },
+    { label: 'Doctors', value: dbStats ? dbStats.total_doctors : '—', icon: 'medical_information', color: 'bg-indigo-100 text-indigo-600', trend: 'Active doctors', up: null },
+    { label: 'Revenue (Paid)', value: dbStats ? `₹${Number(dbStats.total_revenue).toLocaleString('en-IN')}` : '—', icon: 'payments', color: 'bg-emerald-100 text-emerald-600', trend: 'Total collected', up: null },
+    { label: 'Bed Occupancy', value: dbStats ? `${dbStats.total_beds - dbStats.available_beds}/${dbStats.total_beds}` : '—', icon: 'bed', color: 'bg-amber-100 text-amber-600', trend: `${dbStats?.available_beds ?? '—'} available`, up: null },
   ]
 
   const chartBars = [
@@ -44,19 +48,16 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-4 md:p-8 space-y-8">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-slate-900">Admin Dashboard</h1>
           <p className="text-slate-500 text-sm">Overview of hospital operations — {new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/hms/admin/appointments"
-            className="flex items-center gap-2 px-4 py-2 bg-[#0f4b80] text-white rounded-lg text-sm font-semibold shadow-md hover:opacity-90 transition-opacity">
-            <span className="material-symbols-outlined text-lg">add</span>
-            New Appointment
-          </Link>
-        </div>
+        <Link to="/hms/admin/appointments"
+          className="flex items-center gap-2 px-4 py-2 bg-[#0f4b80] text-white rounded-lg text-sm font-semibold shadow-md hover:opacity-90 transition-opacity self-start sm:self-auto">
+          <span className="material-symbols-outlined text-lg">add</span>
+          New Appointment
+        </Link>
       </div>
 
       {/* Stats */}
@@ -72,17 +73,13 @@ export default function AdminDashboard() {
                 <span className="material-symbols-outlined">{s.icon}</span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <span className={`text-xs font-bold ${s.up === true ? 'text-emerald-500' : s.up === false ? 'text-red-500' : 'text-slate-400'}`}>{s.trend}</span>
-              <span className="text-slate-400 text-[10px]">{s.trendLabel}</span>
-            </div>
+            <p className="text-slate-400 text-[10px]">{s.trend}</p>
           </div>
         ))}
       </div>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Line chart */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h4 className="font-bold text-slate-800">Daily Patient Visits</h4>
@@ -105,7 +102,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Bar chart */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-6">
             <h4 className="font-bold text-slate-800">Revenue Trends</h4>
@@ -134,7 +130,6 @@ export default function AdminDashboard() {
 
       {/* Bottom grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Admissions */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h4 className="font-bold text-slate-800">Recent Admissions</h4>
@@ -171,7 +166,6 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* Alerts */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col">
           <div className="p-5 border-b border-slate-100 flex items-center justify-between">
             <h4 className="font-bold text-slate-800">System Alerts</h4>

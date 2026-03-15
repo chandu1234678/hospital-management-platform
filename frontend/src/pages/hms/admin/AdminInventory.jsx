@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { HMS_INVENTORY } from '../../../data/hmsData.js'
+import { hmsService } from '../../../services/api.js'
 
+const STATUS_MAP = { IN_STOCK: 'In Stock', LOW_STOCK: 'Low Stock', OUT_OF_STOCK: 'Critical' }
 const STATUS_COLORS = {
   'In Stock': 'bg-green-100 text-green-700',
   'Low Stock': 'bg-amber-100 text-amber-700',
@@ -9,16 +10,28 @@ const STATUS_COLORS = {
 }
 
 export default function AdminInventory() {
-  const [inventory] = useState(HMS_INVENTORY)
+  const [inventory, setInventory] = useState([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
 
+  useEffect(() => {
+    hmsService.getInventory()
+      .then(items => setInventory(items.map(i => ({
+        ...i,
+        statusLabel: STATUS_MAP[i.status] || i.status,
+        stock: i.quantity,
+      }))))
+      .catch(() => toast.error('Failed to load inventory'))
+      .finally(() => setLoading(false))
+  }, [])
+
   const filtered = inventory.filter(i =>
-    i.name.toLowerCase().includes(search.toLowerCase()) ||
-    i.category.toLowerCase().includes(search.toLowerCase())
+    (i.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (i.category || '').toLowerCase().includes(search.toLowerCase())
   )
 
-  const critical = inventory.filter(i => i.status === 'Critical').length
-  const lowStock = inventory.filter(i => i.status === 'Low Stock').length
+  const critical = inventory.filter(i => i.statusLabel === 'Critical').length
+  const lowStock = inventory.filter(i => i.statusLabel === 'Low Stock').length
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -34,7 +47,6 @@ export default function AdminInventory() {
         </button>
       </div>
 
-      {/* Alert banners */}
       {(critical > 0 || lowStock > 0) && (
         <div className="flex flex-col sm:flex-row gap-3">
           {critical > 0 && (
@@ -60,46 +72,61 @@ export default function AdminInventory() {
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-50">
-              <tr>
-                {['Item', 'Category', 'Stock', 'Unit', 'Reorder Level', 'Status', 'Actions'].map(h => (
-                  <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filtered.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-5 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[#0f4b80]/10 flex items-center justify-center">
-                        <span className="material-symbols-outlined text-[#0f4b80] text-sm">inventory_2</span>
-                      </div>
-                      <span className="font-semibold text-sm">{item.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-4 text-sm text-slate-500">{item.category}</td>
-                  <td className="px-5 py-4">
-                    <span className={`text-sm font-bold ${item.status === 'Critical' ? 'text-red-600' : item.status === 'Low Stock' ? 'text-amber-600' : 'text-slate-900'}`}>
-                      {item.stock}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 text-sm text-slate-500">{item.unit}</td>
-                  <td className="px-5 py-4 text-sm text-slate-500">{item.reorder}</td>
-                  <td className="px-5 py-4">
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[item.status]}`}>{item.status}</span>
-                  </td>
-                  <td className="px-5 py-4">
-                    <button onClick={() => toast.success(`Reorder request sent for ${item.name}`)}
-                      className="text-[#0f4b80] hover:underline text-xs font-bold">Reorder</button>
-                  </td>
+        {loading ? (
+          <div className="text-center py-16 text-slate-400">
+            <span className="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+            <p className="mt-2 text-sm">Loading inventory...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead className="bg-slate-50">
+                <tr>
+                  {['Item', 'SKU', 'Category', 'Stock', 'Unit', 'Reorder Level', 'Expiry', 'Status', 'Actions'].map(h => (
+                    <th key={h} className="px-5 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 whitespace-nowrap">{h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filtered.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-[#0f4b80]/10 flex items-center justify-center">
+                          <span className="material-symbols-outlined text-[#0f4b80] text-sm">inventory_2</span>
+                        </div>
+                        <span className="font-semibold text-sm">{item.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4 text-xs font-mono text-slate-500">{item.sku}</td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{item.category}</td>
+                    <td className="px-5 py-4">
+                      <span className={`text-sm font-bold ${item.statusLabel === 'Critical' ? 'text-red-600' : item.statusLabel === 'Low Stock' ? 'text-amber-600' : 'text-slate-900'}`}>
+                        {item.stock}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{item.unit}</td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{item.reorder_level}</td>
+                    <td className="px-5 py-4 text-sm text-slate-500">{item.expiry_date || '—'}</td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[item.statusLabel] || 'bg-slate-100 text-slate-600'}`}>{item.statusLabel}</span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <button onClick={() => toast.success(`Reorder request sent for ${item.name}`)}
+                        className="text-[#0f4b80] hover:underline text-xs font-bold">Reorder</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {filtered.length === 0 && (
+              <div className="text-center py-12">
+                <span className="material-symbols-outlined text-slate-300 text-4xl">inventory_2</span>
+                <p className="text-slate-500 mt-2">No items found</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
