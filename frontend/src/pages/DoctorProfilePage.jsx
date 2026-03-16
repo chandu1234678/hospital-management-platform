@@ -116,7 +116,7 @@ export default function DoctorProfilePage() {
                 {tab === 'Education' && (
                   <div>
                     <h2 className="text-xl font-bold mb-4">Education</h2>
-                    {doctor.education.map((e, i) => (
+                    {(doctor.education || []).map((e, i) => (
                       <div key={i} className="flex gap-4 mb-4">
                         <div className="mt-1 shrink-0 bg-[#0f4b80]/10 p-2 rounded-lg text-[#0f4b80]">
                           <span className="material-symbols-outlined">school</span>

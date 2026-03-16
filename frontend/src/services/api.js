@@ -89,7 +89,19 @@ export const doctorService = {
   },
 
   async getById(id) {
-    if (BASE_URL) return http('GET', `/doctors/${id}`)
+    if (BASE_URL) {
+      const d = await http('GET', `/doctors/${id}`)
+      let slots = []
+      try { slots = JSON.parse(d.available_slots || '[]') } catch (_) {}
+      return {
+        ...d,
+        fee: d.consultation_fee,
+        about: d.bio || '',
+        slots,
+        location: d.location || 'Main Building',
+        education: d.education || [{ degree: d.qualification || 'MBBS', institution: 'Medical University', year: '' }],
+      }
+    }
     await delay(400)
     const doc = DOCTORS.find(d => d.id === Number(id))
     if (!doc) throw new Error('Doctor not found')
@@ -147,6 +159,7 @@ export const patientService = {
         emergencyContact: p.emergency_contact,
         dateOfBirth: p.date_of_birth,
         medicalHistory: p.medical_history,
+        medications: p.medical_history,
       }
     }
     await delay(400)
@@ -156,6 +169,8 @@ export const patientService = {
   async updateProfile(data) {
     if (BASE_URL) {
       const payload = {
+        name: data.name,
+        phone: data.phone,
         blood_group: data.bloodGroup || data.blood_group,
         emergency_contact: data.emergencyContact || data.emergency_contact,
         date_of_birth: data.dateOfBirth || data.date_of_birth,
@@ -171,6 +186,7 @@ export const patientService = {
         emergencyContact: p.emergency_contact,
         dateOfBirth: p.date_of_birth,
         medicalHistory: p.medical_history,
+        medications: p.medical_history,
       }
     }
     await delay(600)
@@ -190,7 +206,7 @@ export const reportService = {
         patientId = profile?.id
       } catch (_) {}
       const params = patientId ? `?patient_id=${patientId}` : ''
-      const reports = await http('GET', `/lab-reports${params}`, null, getToken())
+      const reports = await http('GET', `/lab-reports${params}`, null, getToken()).catch(() => [])
       return reports.map(r => ({
         ...r,
         name: r.test_name,
@@ -228,7 +244,7 @@ export const prescriptionService = {
         patientId = profile?.id
       } catch (_) {}
       const params = patientId ? `?patient_id=${patientId}` : ''
-      const rxList = await http('GET', `/prescriptions${params}`, null, getToken())
+      const rxList = await http('GET', `/prescriptions${params}`, null, getToken()).catch(() => [])
       return rxList.map(rx => {
         let meds = []
         try { meds = JSON.parse(rx.medications) } catch (_) {}
@@ -298,6 +314,16 @@ export const adminService = {
     await delay(400)
     return { total_patients: 0, total_doctors: 0, total_appointments: 0, today_appointments: 0, available_beds: 0, total_beds: 0, pending_bills: 0, total_revenue: 0 }
   },
+
+  async getReport(type, period) {
+    if (BASE_URL) return http('GET', `/admin/reports?report_type=${type}&period=${period}`, null, getHmsToken())
+    return { type, period, summary: {}, rows: [] }
+  },
+
+  async getReportCustom(type, start, end) {
+    if (BASE_URL) return http('GET', `/admin/reports?report_type=${type}&period=custom&start_date=${start}&end_date=${end}`, null, getHmsToken())
+    return { type, period: 'custom', summary: {}, rows: [] }
+  },
 }
 
 // ─── HMS services (admin + doctor portal) ────────────────────────────────────
@@ -331,6 +357,36 @@ export const hmsService = {
   async getBeds() {
     if (BASE_URL) return http('GET', '/beds', null, getHmsToken())
     return []
+  },
+
+  async addBed(data) {
+    if (BASE_URL) return http('POST', '/beds', data, getHmsToken())
+    return { id: Date.now(), ...data }
+  },
+
+  async updateBed(id, data) {
+    if (BASE_URL) return http('PATCH', `/beds/${id}`, data, getHmsToken())
+    return { id, ...data }
+  },
+
+  async deleteBed(id) {
+    if (BASE_URL) return http('DELETE', `/beds/${id}`, null, getHmsToken())
+    return {}
+  },
+
+  async updateDoctor(id, data) {
+    if (BASE_URL) return http('PATCH', `/doctors/${id}`, data, getHmsToken())
+    return { id, ...data }
+  },
+
+  async getDoctorSchedule(id) {
+    if (BASE_URL) return http('GET', `/doctors/${id}/schedule`, null, getHmsToken())
+    return []
+  },
+
+  async setDoctorSchedule(id, entries) {
+    if (BASE_URL) return http('POST', `/doctors/${id}/schedule`, entries, getHmsToken())
+    return entries
   },
 
   // Doctor portal

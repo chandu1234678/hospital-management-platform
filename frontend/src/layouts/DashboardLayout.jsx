@@ -27,7 +27,7 @@ function Sidebar({ onClose }) {
   return (
     <div className="flex flex-col h-full">
       <div className="p-5 flex items-center gap-2 border-b border-slate-100">
-        <Logo height={34} />
+        <Link to="/" onClick={onClose}><Logo height={34} /></Link>
         <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">My Health</p>
       </div>
       <div className="px-4 py-4 border-b border-slate-100">
@@ -85,7 +85,7 @@ export default function DashboardLayout() {
       {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-slate-200 px-4 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Logo height={30} />
+          <Link to="/"><Logo height={30} /></Link>
         </div>
         <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
           <span className="material-symbols-outlined">menu</span>

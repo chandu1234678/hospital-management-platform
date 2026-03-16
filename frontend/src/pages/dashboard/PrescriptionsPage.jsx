@@ -7,7 +7,9 @@ export default function PrescriptionsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    prescriptionService.getAll().then(data => { setPrescriptions(data); setLoading(false) })
+    prescriptionService.getAll()
+      .then(data => { setPrescriptions(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const handleRefill = async (rx) => {

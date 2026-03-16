@@ -14,7 +14,9 @@ export default function LabReportsPage() {
   const [preview, setPreview] = useState(null)
 
   useEffect(() => {
-    reportService.getAll().then(data => { setReports(data); setLoading(false) })
+    reportService.getAll()
+      .then(data => { setReports(data); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const handleDownload = (report) => {
