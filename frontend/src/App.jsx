@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 
 // Public pages
@@ -11,6 +11,7 @@ import ServicesPage from './pages/ServicesPage.jsx'
 import ContactPage from './pages/ContactPage.jsx'
 import FAQPage from './pages/FAQPage.jsx'
 import EmergencyPage from './pages/EmergencyPage.jsx'
+import MaintenancePage from './pages/MaintenancePage.jsx'
 
 // Auth pages
 import LoginPage from './pages/LoginPage.jsx'
@@ -78,42 +79,53 @@ import AdminStaff from './pages/hms/admin/AdminStaff.jsx'
 import AdminBeds from './pages/hms/admin/AdminBeds.jsx'
 import DoctorSchedule from './pages/hms/doctor/DoctorSchedule.jsx'
 
+// Guard: redirects public visitors to /maintenance when maintenance mode is on
+function MaintenanceGuard({ children }) {
+  const location = useLocation()
+  const isMaintenance = localStorage.getItem('deepthi-maintenance') === '1'
+  if (isMaintenance) return <Navigate to="/maintenance" replace state={{ from: location }} />
+  return children
+}
+
 export default function App() {
   return (
     <>
       <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
       <Routes>
-        {/* Public */}
-        <Route path="/" element={<HomePage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/doctors" element={<DoctorsPage />} />
-        <Route path="/doctors/:id" element={<DoctorProfilePage />} />
-        <Route path="/departments" element={<DepartmentsPage />} />
-        <Route path="/services" element={<ServicesPage />} />
-        <Route path="/contact" element={<ContactPage />} />
-        <Route path="/faq" element={<FAQPage />} />
-        <Route path="/emergency" element={<EmergencyPage />} />
+        {/* Maintenance page — always accessible */}
+        <Route path="/maintenance" element={<MaintenancePage />} />
 
-        {/* Auth */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="/verify-otp" element={<VerifyOtpPage />} />
+        {/* Public — blocked during maintenance */}
+        <Route path="/" element={<MaintenanceGuard><HomePage /></MaintenanceGuard>} />
+        <Route path="/about" element={<MaintenanceGuard><AboutPage /></MaintenanceGuard>} />
+        <Route path="/doctors" element={<MaintenanceGuard><DoctorsPage /></MaintenanceGuard>} />
+        <Route path="/doctors/:id" element={<MaintenanceGuard><DoctorProfilePage /></MaintenanceGuard>} />
+        <Route path="/departments" element={<MaintenanceGuard><DepartmentsPage /></MaintenanceGuard>} />
+        <Route path="/services" element={<MaintenanceGuard><ServicesPage /></MaintenanceGuard>} />
+        <Route path="/contact" element={<MaintenanceGuard><ContactPage /></MaintenanceGuard>} />
+        <Route path="/faq" element={<MaintenanceGuard><FAQPage /></MaintenanceGuard>} />
+        <Route path="/emergency" element={<MaintenanceGuard><EmergencyPage /></MaintenanceGuard>} />
 
-        {/* Booking */}
-        <Route path="/book-appointment" element={<BookAppointmentPage />} />
-        <Route path="/appointment-confirmation" element={<AppointmentConfirmationPage />} />
+        {/* Auth — also blocked during maintenance */}
+        <Route path="/login" element={<MaintenanceGuard><LoginPage /></MaintenanceGuard>} />
+        <Route path="/register" element={<MaintenanceGuard><RegisterPage /></MaintenanceGuard>} />
+        <Route path="/forgot-password" element={<MaintenanceGuard><ForgotPasswordPage /></MaintenanceGuard>} />
+        <Route path="/verify-otp" element={<MaintenanceGuard><VerifyOtpPage /></MaintenanceGuard>} />
 
-        {/* Dashboard (protected) */}
+        {/* Booking — blocked during maintenance */}
+        <Route path="/book-appointment" element={<MaintenanceGuard><BookAppointmentPage /></MaintenanceGuard>} />
+        <Route path="/appointment-confirmation" element={<MaintenanceGuard><AppointmentConfirmationPage /></MaintenanceGuard>} />
+
+        {/* Dashboard (protected) — blocked during maintenance */}
         <Route element={<ProtectedRoute />}>
           <Route element={<DashboardLayout />}>
-            <Route path="/dashboard" element={<DashboardHome />} />
-            <Route path="/dashboard/appointments" element={<AppointmentsPage />} />
-            <Route path="/dashboard/prescriptions" element={<PrescriptionsPage />} />
-            <Route path="/dashboard/lab-reports" element={<LabReportsPage />} />
-            <Route path="/dashboard/profile" element={<ProfilePage />} />
-            <Route path="/dashboard/billing" element={<BillingPage />} />
-            <Route path="/dashboard/notifications" element={<NotificationsPage />} />
+            <Route path="/dashboard" element={<MaintenanceGuard><DashboardHome /></MaintenanceGuard>} />
+            <Route path="/dashboard/appointments" element={<MaintenanceGuard><AppointmentsPage /></MaintenanceGuard>} />
+            <Route path="/dashboard/prescriptions" element={<MaintenanceGuard><PrescriptionsPage /></MaintenanceGuard>} />
+            <Route path="/dashboard/lab-reports" element={<MaintenanceGuard><LabReportsPage /></MaintenanceGuard>} />
+            <Route path="/dashboard/profile" element={<MaintenanceGuard><ProfilePage /></MaintenanceGuard>} />
+            <Route path="/dashboard/billing" element={<MaintenanceGuard><BillingPage /></MaintenanceGuard>} />
+            <Route path="/dashboard/notifications" element={<MaintenanceGuard><NotificationsPage /></MaintenanceGuard>} />
           </Route>
         </Route>
 
@@ -166,8 +178,8 @@ export default function App() {
         </Route>
 
         {/* Public legal pages */}
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<MaintenanceGuard><PrivacyPolicyPage /></MaintenanceGuard>} />
+        <Route path="/terms" element={<MaintenanceGuard><TermsPage /></MaintenanceGuard>} />
 
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />

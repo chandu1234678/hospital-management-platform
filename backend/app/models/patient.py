@@ -12,7 +12,7 @@ class Patient(Base, TimestampMixin):
     gender: Mapped[str] = mapped_column(String(10), nullable=True)
     blood_group: Mapped[str] = mapped_column(String(5), nullable=True)
     address: Mapped[str] = mapped_column(Text, nullable=True)
-    emergency_contact: Mapped[str] = mapped_column(String(20), nullable=True)
+    emergency_contact: Mapped[str] = mapped_column(String(255), nullable=True)
     allergies: Mapped[str] = mapped_column(Text, nullable=True)
     medical_history: Mapped[str] = mapped_column(Text, nullable=True)
 

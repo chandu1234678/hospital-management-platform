@@ -11,10 +11,21 @@ export default function AdminSettings() {
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     notifications: true,
-    maintenanceMode: false,
+    maintenanceMode: localStorage.getItem('deepthi-maintenance') === '1',
   })
 
   const handleSave = () => toast.success('Settings saved successfully!')
+
+  const handleToggle = (key) => {
+    if (key === 'maintenanceMode') {
+      const next = !settings.maintenanceMode
+      setSettings(s => ({ ...s, maintenanceMode: next }))
+      localStorage.setItem('deepthi-maintenance', next ? '1' : '0')
+      toast.success(next ? 'Maintenance mode enabled — public site is now blocked' : 'Maintenance mode disabled — public site is live')
+    } else {
+      setSettings(s => ({ ...s, [key]: !s[key] }))
+    }
+  }
 
   return (
     <div className="p-4 md:p-8 space-y-6 max-w-3xl">
@@ -84,9 +95,11 @@ export default function AdminSettings() {
               <p className="font-semibold text-sm text-slate-900">{t.label}</p>
               <p className="text-xs text-slate-500">{t.desc}</p>
             </div>
-            <button onClick={() => setSettings(s => ({ ...s, [t.key]: !s[t.key] }))}
-              className={`relative w-12 h-6 rounded-full transition-colors ${settings[t.key] ? 'bg-[#0f4b80]' : 'bg-slate-300'}`}>
-              <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${settings[t.key] ? 'translate-x-7' : 'translate-x-1'}`} />
+            <button
+              onClick={() => handleToggle(t.key)}
+              className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 focus:outline-none ${settings[t.key] ? 'bg-[#0f4b80]' : 'bg-slate-300'}`}
+            >
+              <span className={`inline-block w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${settings[t.key] ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>
           </div>
         ))}

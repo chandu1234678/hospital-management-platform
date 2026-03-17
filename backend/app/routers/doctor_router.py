@@ -1,13 +1,36 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from typing import Optional
+from typing import Optional, List
+from pydantic import BaseModel
 from app.core.database import get_db
 from app.core.deps import get_current_user, require_roles
 from app.models.user import User
 from app.models.doctor import Doctor
+from app.models.doctor_schedule import DoctorSchedule
 from app.models.appointment import Appointment
 from app.models.patient import Patient
+
+
+class DoctorUpdate(BaseModel):
+    specialty: Optional[str] = None
+    department: Optional[str] = None
+    qualification: Optional[str] = None
+    experience_years: Optional[int] = None
+    consultation_fee: Optional[float] = None
+    bio: Optional[str] = None
+    available_slots: Optional[str] = None
+    is_available: Optional[bool] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+
+
+class ScheduleEntry(BaseModel):
+    day_of_week: str
+    start_time: str
+    end_time: str
+    slot_duration_minutes: int = 30
+    is_active: bool = True
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
@@ -84,6 +107,103 @@ async def get_doctor(doctor_id: int, db: AsyncSession = Depends(get_db)):
     data = _format_doctor(d, u)
     data["available_slots"] = d.available_slots
     return data
+
+
+@router.patch("/{doctor_id}", response_model=dict)
+async def update_doctor(
+    doctor_id: int,
+    data: DoctorUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("ADMIN")),
+):
+    result = await db.execute(select(Doctor).where(Doctor.id == doctor_id))
+    d = result.scalar_one_or_none()
+    if not d:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    user_result = await db.execute(select(User).where(User.id == d.user_id))
+    u = user_result.scalar_one_or_none()
+    # Update doctor fields
+    for k, v in data.model_dump(exclude_none=True).items():
+        if k in ("name", "phone"):
+            continue
+        if hasattr(d, k):
+            setattr(d, k, v)
+    # Update user fields
+    if data.name and u:
+        u.name = data.name
+    if data.phone and u:
+        u.phone = data.phone
+    await db.commit()
+    await db.refresh(d)
+    if u:
+        await db.refresh(u)
+    result_data = _format_doctor(d, u)
+    result_data["available_slots"] = d.available_slots
+    return result_data
+
+
+@router.get("/{doctor_id}/schedule", response_model=list[dict])
+async def get_doctor_schedule(
+    doctor_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("ADMIN", "DOCTOR", "RECEPTION")),
+):
+    result = await db.execute(select(DoctorSchedule).where(DoctorSchedule.doctor_id == doctor_id))
+    schedules = result.scalars().all()
+    return [
+        {
+            "id": s.id,
+            "doctor_id": s.doctor_id,
+            "day_of_week": s.day_of_week,
+            "start_time": s.start_time,
+            "end_time": s.end_time,
+            "slot_duration_minutes": s.slot_duration_minutes,
+            "is_active": s.is_active,
+        }
+        for s in schedules
+    ]
+
+
+@router.post("/{doctor_id}/schedule", response_model=list[dict])
+async def set_doctor_schedule(
+    doctor_id: int,
+    entries: List[ScheduleEntry],
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_roles("ADMIN")),
+):
+    """Replace all schedule entries for a doctor."""
+    # Delete existing
+    existing = await db.execute(select(DoctorSchedule).where(DoctorSchedule.doctor_id == doctor_id))
+    for s in existing.scalars().all():
+        await db.delete(s)
+    # Insert new
+    new_schedules = []
+    for e in entries:
+        s = DoctorSchedule(
+            doctor_id=doctor_id,
+            day_of_week=e.day_of_week,
+            start_time=e.start_time,
+            end_time=e.end_time,
+            slot_duration_minutes=e.slot_duration_minutes,
+            is_active=e.is_active,
+        )
+        db.add(s)
+        new_schedules.append(s)
+    await db.commit()
+    for s in new_schedules:
+        await db.refresh(s)
+    return [
+        {
+            "id": s.id,
+            "doctor_id": s.doctor_id,
+            "day_of_week": s.day_of_week,
+            "start_time": s.start_time,
+            "end_time": s.end_time,
+            "slot_duration_minutes": s.slot_duration_minutes,
+            "is_active": s.is_active,
+        }
+        for s in new_schedules
+    ]
 
 
 @router.get("/me/appointments")

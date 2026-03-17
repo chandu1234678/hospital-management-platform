@@ -65,6 +65,7 @@ export default function HmsLoginPage({ role = 'admin' }) {
       const user = await authService.login(data.email.trim(), data.password.trim())
       // Store token for HMS portal use
       localStorage.setItem('hms-token', user.token)
+      if (user.refresh_token) localStorage.setItem('hms-refresh-token', user.refresh_token)
       localStorage.setItem('hms-user', JSON.stringify(user))
       toast.success(`Welcome to ${config.title}!`)
       navigate(config.redirect)

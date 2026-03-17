@@ -4,20 +4,7 @@ import { MOCK_CREDENTIALS, MOCK_USER, DOCTORS, MOCK_APPOINTMENTS, MOCK_PRESCRIPT
 const BASE_URL = import.meta.env.VITE_API_URL || null
 const delay = (ms = 600) => new Promise(r => setTimeout(r, ms))
 
-// ─── HTTP helper ─────────────────────────────────────────────────────────────
-async function http(method, path, body, token) {
-  const headers = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.detail || `Request failed: ${res.status}`)
-  return data
-}
-
+// ─── Token helpers ────────────────────────────────────────────────────────────
 const getToken = () => {
   try {
     const s = JSON.parse(localStorage.getItem('deepthi-auth') || '{}')
@@ -29,6 +16,64 @@ const getHmsToken = () => {
   try {
     return localStorage.getItem('hms-token') || getToken()
   } catch { return null }
+}
+
+const getHmsRefreshToken = () => {
+  try {
+    return localStorage.getItem('hms-refresh-token') || null
+  } catch { return null }
+}
+
+// ─── Silent token refresh ─────────────────────────────────────────────────────
+let _refreshing = null  // deduplicate concurrent refresh calls
+
+async function silentRefresh() {
+  if (_refreshing) return _refreshing
+  _refreshing = (async () => {
+    const refreshToken = getHmsRefreshToken()
+    if (!refreshToken) throw new Error('No refresh token')
+    const res = await fetch(`${BASE_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+    if (!res.ok) throw new Error('Refresh failed')
+    const data = await res.json()
+    localStorage.setItem('hms-token', data.access_token)
+    if (data.refresh_token) localStorage.setItem('hms-refresh-token', data.refresh_token)
+    return data.access_token
+  })()
+  _refreshing.finally(() => { _refreshing = null })
+  return _refreshing
+}
+
+// ─── HTTP helper ─────────────────────────────────────────────────────────────
+async function http(method, path, body, token, _retry = false) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const data = await res.json().catch(() => ({}))
+
+  // Auto-refresh on 401 for HMS calls (token passed = authenticated call)
+  if (res.status === 401 && token && !_retry && BASE_URL) {
+    const refreshToken = getHmsRefreshToken()
+    if (refreshToken) {
+      try {
+        const newToken = await silentRefresh()
+        return http(method, path, body, newToken, true)
+      } catch {
+        localStorage.removeItem('hms-token')
+        localStorage.removeItem('hms-refresh-token')
+      }
+    }
+  }
+
+  if (!res.ok) throw new Error(data.detail || `Request failed: ${res.status}`)
+  return data
 }
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
@@ -334,6 +379,11 @@ export const hmsService = {
     return []
   },
 
+  async cancelAppointment(id) {
+    if (BASE_URL) return http('DELETE', `/appointments/${id}`, null, getHmsToken())
+    return {}
+  },
+
   async getPatients() {
     if (BASE_URL) return http('GET', '/admin/patients', null, getHmsToken())
     return []
@@ -371,6 +421,52 @@ export const hmsService = {
 
   async deleteBed(id) {
     if (BASE_URL) return http('DELETE', `/beds/${id}`, null, getHmsToken())
+    return {}
+  },
+
+  async createLabReport(data) {
+    if (BASE_URL) return http('POST', '/lab-reports', data, getHmsToken())
+    return { id: Date.now(), ...data, status: 'PENDING' }
+  },
+
+  async updateLabReport(id, data) {
+    if (BASE_URL) return http('PATCH', `/lab-reports/${id}`, data, getHmsToken())
+    return { id, ...data }
+  },
+
+  async createBill(data) {
+    if (BASE_URL) return http('POST', '/billing', data, getHmsToken())
+    return { id: Date.now(), ...data }
+  },
+
+  async createPatient(data) {
+    // Creates user + patient profile via auth register
+    if (BASE_URL) return http('POST', '/auth/register', { ...data, role: 'PATIENT' })
+    return { id: Date.now(), ...data }
+  },
+
+  async createDoctor(data) {
+    if (BASE_URL) return http('POST', '/admin/doctors', data, getHmsToken())
+    return { id: Date.now(), ...data }
+  },
+
+  async createAppointment(data) {
+    if (BASE_URL) return http('POST', '/admin/appointments', data, getHmsToken())
+    return { id: Date.now(), ...data, status: 'SCHEDULED' }
+  },
+
+  async addInventoryItem(data) {
+    if (BASE_URL) return http('POST', '/inventory', data, getHmsToken())
+    return { id: Date.now(), ...data }
+  },
+
+  async updateInventoryItem(id, data) {
+    if (BASE_URL) return http('PATCH', `/inventory/${id}`, data, getHmsToken())
+    return { id, ...data }
+  },
+
+  async deleteInventoryItem(id) {
+    if (BASE_URL) return http('DELETE', `/inventory/${id}`, null, getHmsToken())
     return {}
   },
 

@@ -49,3 +49,13 @@ async def update_bed(bed_id: int, data: BedUpdate, db: AsyncSession = Depends(ge
     return bed
 
 
+
+
+@router.delete("/{bed_id}", status_code=204)
+async def delete_bed(bed_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+    result = await db.execute(select(Bed).where(Bed.id == bed_id))
+    bed = result.scalar_one_or_none()
+    if not bed:
+        raise HTTPException(status_code=404, detail="Bed not found")
+    await db.delete(bed)
+    await db.commit()

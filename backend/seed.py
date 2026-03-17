@@ -38,6 +38,17 @@ DOCTORS_DATA = [
     dict(name="Dr. Ramesh Gupta",   email="ramesh@deepthi.com",  specialty="Internal Medicine",       department="Internal Medicine",qualification="MD Internal Medicine, AIIMS",         experience_years=18, consultation_fee=900,  rating=4.6, bio="General adult medicine and preventive care.", available_slots='["09:00 AM","10:00 AM","11:00 AM","12:00 PM","02:00 PM","03:00 PM"]'),
 ]
 
+EXTRA_PATIENTS = [
+    dict(name="Priya Nair",      email="priya.nair@gmail.com",    phone="9876501001", dob="1990-03-22", gender="Female", blood_group="A+",  address="45 Rose Garden, Bangalore", emergency_contact="Ravi Nair - 9876501002",  allergies="None",       medical_history="Diabetes Type 2"),
+    dict(name="Suresh Reddy",    email="suresh.reddy@gmail.com",  phone="9876501003", dob="1978-11-05", gender="Male",   blood_group="B+",  address="12 MG Road, Hyderabad",     emergency_contact="Latha Reddy - 9876501004", allergies="Sulfa drugs", medical_history="Hypertension"),
+    dict(name="Kavitha Menon",   email="kavitha.m@gmail.com",     phone="9876501005", dob="1985-07-14", gender="Female", blood_group="O-",  address="78 Anna Nagar, Chennai",    emergency_contact="Mohan Menon - 9876501006", allergies="Penicillin",  medical_history="Asthma"),
+    dict(name="Rahul Sharma",    email="rahul.sharma@gmail.com",  phone="9876501007", dob="1995-01-30", gender="Male",   blood_group="AB+", address="23 Sector 5, Delhi",        emergency_contact="Sunita Sharma - 9876501008", allergies="None",      medical_history="None"),
+    dict(name="Deepa Krishnan",  email="deepa.k@gmail.com",       phone="9876501009", dob="1982-09-18", gender="Female", blood_group="A-",  address="56 Koramangala, Bangalore", emergency_contact="Vijay Krishnan - 9876501010", allergies="Aspirin",   medical_history="Migraine"),
+    dict(name="Arun Patel",      email="arun.patel@gmail.com",    phone="9876501011", dob="1970-06-25", gender="Male",   blood_group="O+",  address="34 CG Road, Ahmedabad",     emergency_contact="Meena Patel - 9876501012",  allergies="None",       medical_history="Knee arthritis"),
+    dict(name="Sneha Iyer",      email="sneha.iyer@gmail.com",    phone="9876501013", dob="1998-12-10", gender="Female", blood_group="B-",  address="89 Jubilee Hills, Hyderabad", emergency_contact="Rajan Iyer - 9876501014", allergies="Latex",      medical_history="None"),
+    dict(name="Vikram Singh",    email="vikram.singh@gmail.com",  phone="9876501015", dob="1965-04-08", gender="Male",   blood_group="A+",  address="67 Civil Lines, Jaipur",    emergency_contact="Anita Singh - 9876501016",  allergies="None",       medical_history="Cardiac stent 2022"),
+]
+
 INVENTORY_DATA = [
     dict(name="Paracetamol 500mg",    category="MEDICINE",    sku="MED-001", quantity=2400, unit="Tablets",   unit_price=0.5,   reorder_level=500,  expiry_date="2027-06-30", supplier="Sun Pharma",      status="IN_STOCK"),
     dict(name="Adrenaline 1mg/ml",    category="MEDICINE",    sku="MED-002", quantity=12,   unit="Vials",     unit_price=85.0,  reorder_level=50,   expiry_date="2026-12-31", supplier="Cipla",           status="LOW_STOCK"),
@@ -79,14 +90,16 @@ async def seed():
 
     async with AsyncSessionLocal() as db:
         # ── Admin users ─────────────────────────────────────────────────────────
-        for email, name, role in [
-            ("admin@deepthi.com",           "Admin",      "ADMIN"),
-            ("admin@deepthihospitals.com",  "HMS Admin",  "ADMIN"),
-            ("reception@deepthihospitals.com", "Reception Staff", "RECEPTION"),
+        for email, name, role, phone in [
+            ("admin@deepthi.com",              "Admin",             "ADMIN",      "9000000000"),
+            ("admin@deepthihospitals.com",     "HMS Admin",         "ADMIN",      "9000000001"),
+            ("reception@deepthihospitals.com", "Reception Staff",   "RECEPTION",  "9000000002"),
+            ("reception2@deepthihospitals.com","Reception Staff 2", "RECEPTION",  "9000000003"),
+            ("staff@deepthihospitals.com",     "Staff Member",      "STAFF",      "9000000004"),
         ]:
             res = await db.execute(select(User).where(User.email == email))
             if not res.scalar_one_or_none():
-                db.add(User(name=name, email=email, phone="9000000000",
+                db.add(User(name=name, email=email, phone=phone,
                             password=hash_password("admin123"), role=role))
                 print(f"✓ {name} ({email})")
 
@@ -147,7 +160,113 @@ async def seed():
             await db.commit()
             print(f"✓ {len(BEDS_DATA)} beds")
 
-        # ── Patient appointments, prescriptions, lab reports, bills ─────────────
+        # ── Extra patients ───────────────────────────────────────────────────────
+        extra_patient_ids = {}
+        for ep in EXTRA_PATIENTS:
+            res = await db.execute(select(User).where(User.email == ep["email"]))
+            ep_user = res.scalar_one_or_none()
+            if not ep_user:
+                ep_user = User(name=ep["name"], email=ep["email"], phone=ep["phone"],
+                               password=hash_password("patient123"), role="PATIENT")
+                db.add(ep_user)
+                await db.flush()
+                ep_pat = Patient(user_id=ep_user.id, date_of_birth=ep["dob"], gender=ep["gender"],
+                                 blood_group=ep["blood_group"], address=ep["address"],
+                                 emergency_contact=ep["emergency_contact"],
+                                 allergies=ep["allergies"], medical_history=ep["medical_history"])
+                db.add(ep_pat)
+                await db.flush()
+                extra_patient_ids[ep["email"]] = ep_pat.id
+                print(f"✓ Extra patient {ep['name']}")
+            else:
+                res2 = await db.execute(select(Patient).where(Patient.user_id == ep_user.id))
+                ep_pat = res2.scalar_one_or_none()
+                if ep_pat:
+                    extra_patient_ids[ep["email"]] = ep_pat.id
+        await db.commit()
+
+        # ── Rich appointments + bills for reports ────────────────────────────────
+        from datetime import date, timedelta
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+
+        EXTRA_APPTS = [
+            # Today's appointments
+            dict(email="priya.nair@gmail.com",   doc="rajesh@deepthi.com",  dept="Cardiology",       date=str(today),      time="09:00 AM", status="SCHEDULED", fee=1500, reason="Chest pain evaluation"),
+            dict(email="suresh.reddy@gmail.com", doc="ramesh@deepthi.com",  dept="Internal Medicine",date=str(today),      time="10:00 AM", status="COMPLETED", fee=900,  reason="Diabetes follow-up"),
+            dict(email="kavitha.m@gmail.com",    doc="priya@deepthi.com",   dept="Neurology",        date=str(today),      time="11:30 AM", status="SCHEDULED", fee=1800, reason="Migraine treatment"),
+            dict(email="rahul.sharma@gmail.com", doc="anil@deepthi.com",    dept="Orthopedics",      date=str(today),      time="02:30 PM", status="SCHEDULED", fee=2000, reason="Sports injury"),
+            dict(email="deepa.k@gmail.com",      doc="meena@deepthi.com",   dept="Dermatology",      date=str(today),      time="03:00 PM", status="COMPLETED", fee=1000, reason="Skin rash"),
+            # Yesterday's appointments
+            dict(email="arun.patel@gmail.com",   doc="anil@deepthi.com",    dept="Orthopedics",      date=str(yesterday),  time="09:30 AM", status="COMPLETED", fee=2000, reason="Knee replacement consult"),
+            dict(email="sneha.iyer@gmail.com",   doc="sarah@deepthi.com",   dept="Pediatrics",       date=str(yesterday),  time="10:00 AM", status="COMPLETED", fee=1200, reason="Routine checkup"),
+            dict(email="vikram.singh@gmail.com", doc="rajesh@deepthi.com",  dept="Cardiology",       date=str(yesterday),  time="11:00 AM", status="COMPLETED", fee=1500, reason="Post-stent follow-up"),
+            dict(email="priya.nair@gmail.com",   doc="kavitha@deepthi.com", dept="Psychiatry",       date=str(yesterday),  time="02:00 PM", status="CANCELLED", fee=1400, reason="Anxiety consultation"),
+            # This week
+            dict(email="suresh.reddy@gmail.com", doc="vikram@deepthi.com",  dept="Ophthalmology",    date=str(today - timedelta(days=2)), time="09:00 AM", status="COMPLETED", fee=1300, reason="Eye checkup"),
+            dict(email="rahul.sharma@gmail.com", doc="suresh@deepthi.com",  dept="Gastroenterology", date=str(today - timedelta(days=3)), time="11:00 AM", status="COMPLETED", fee=1600, reason="Stomach pain"),
+            dict(email="deepa.k@gmail.com",      doc="ananya@deepthi.com",  dept="Oncology",         date=str(today - timedelta(days=4)), time="10:00 AM", status="COMPLETED", fee=2500, reason="Routine cancer screening"),
+            # This month
+            dict(email="kavitha.m@gmail.com",    doc="ramesh@deepthi.com",  dept="Internal Medicine",date=str(today - timedelta(days=7)),  time="09:00 AM", status="COMPLETED", fee=900,  reason="General checkup"),
+            dict(email="arun.patel@gmail.com",   doc="rajesh@deepthi.com",  dept="Cardiology",       date=str(today - timedelta(days=10)), time="10:30 AM", status="COMPLETED", fee=1500, reason="ECG review"),
+            dict(email="vikram.singh@gmail.com", doc="priya@deepthi.com",   dept="Neurology",        date=str(today - timedelta(days=12)), time="11:00 AM", status="COMPLETED", fee=1800, reason="Headache evaluation"),
+        ]
+
+        for appt_data in EXTRA_APPTS:
+            pat_id = extra_patient_ids.get(appt_data["email"])
+            doc_id = doctor_ids.get(appt_data["doc"])
+            if not pat_id or not doc_id:
+                continue
+            # Check if already exists
+            res = await db.execute(select(Appointment).where(
+                Appointment.patient_id == pat_id,
+                Appointment.appointment_date == appt_data["date"],
+                Appointment.appointment_time == appt_data["time"],
+            ))
+            if res.scalar_one_or_none():
+                continue
+            appt = Appointment(
+                patient_id=pat_id, doctor_id=doc_id,
+                appointment_date=appt_data["date"], appointment_time=appt_data["time"],
+                department=appt_data["dept"], reason=appt_data["reason"],
+                status=appt_data["status"], token_number=1,
+            )
+            db.add(appt)
+            await db.flush()
+            # Bill
+            paid_status = "PAID" if appt_data["status"] == "COMPLETED" else ("PENDING" if appt_data["status"] == "SCHEDULED" else "CANCELLED")
+            paid_at = f"{appt_data['date']}T10:00:00" if paid_status == "PAID" else None
+            db.add(Bill(
+                patient_id=pat_id, appointment_id=appt.id,
+                bill_number=f"BILL-{appt_data['date'].replace('-','')}-{appt.id:03d}",
+                items=json.dumps([{"name": f"Consultation - {appt_data['dept']}", "qty": 1, "price": appt_data["fee"]}]),
+                subtotal=appt_data["fee"], tax=0, discount=0, total=appt_data["fee"],
+                status=paid_status, payment_method="RAZORPAY" if paid_status == "PAID" else None,
+                paid_at=paid_at,
+            ))
+        await db.commit()
+        print(f"✓ {len(EXTRA_APPTS)} extra appointments + bills")
+
+        # ── Extra lab reports ────────────────────────────────────────────────────
+        for email, doc_email, test, ttype, rdate, status, remarks in [
+            ("priya.nair@gmail.com",   "rajesh@deepthi.com", "Lipid Profile",    "Biochemistry", str(today),           "COMPLETED", "LDL slightly elevated. Dietary changes advised."),
+            ("suresh.reddy@gmail.com", "ramesh@deepthi.com", "HbA1c",            "Biochemistry", str(today),           "COMPLETED", "HbA1c 7.2% — controlled. Continue medication."),
+            ("vikram.singh@gmail.com", "rajesh@deepthi.com", "Echocardiogram",   "Cardiac",      str(yesterday),       "COMPLETED", "EF 55% — normal. No wall motion abnormality."),
+            ("kavitha.m@gmail.com",    "priya@deepthi.com",  "EEG",              "Neurology",    str(yesterday),       "PENDING",   "Awaiting analysis"),
+            ("arun.patel@gmail.com",   "anil@deepthi.com",   "Knee X-Ray",       "Radiology",    str(today - timedelta(days=2)), "COMPLETED", "Grade 2 osteoarthritis. Physiotherapy recommended."),
+        ]:
+            pat_id = extra_patient_ids.get(email)
+            doc_id = doctor_ids.get(doc_email)
+            if not pat_id or not doc_id:
+                continue
+            res = await db.execute(select(LabReport).where(LabReport.patient_id == pat_id, LabReport.test_name == test))
+            if not res.scalar_one_or_none():
+                db.add(LabReport(patient_id=pat_id, doctor_id=doc_id, test_name=test, test_type=ttype,
+                                 report_date=rdate, status=status, remarks=remarks))
+        await db.commit()
+        print("✓ Extra lab reports")
+
+
         res = await db.execute(select(Patient).join(User).where(User.email == "arjun@deepthi.com"))
         patient = res.scalar_one_or_none()
 
@@ -266,11 +385,13 @@ async def seed():
                 print("✓ Lab reports")
 
     print("\n✅ Seed complete!")
-    print("   Patient  : arjun@deepthi.com / password123")
-    print("   Admin    : admin@deepthi.com / admin123")
-    print("   HMS Admin: admin@deepthihospitals.com / admin123")
-    print("   Doctor   : rajesh@deepthi.com / doctor123")
-    print("   Reception: reception@deepthihospitals.com / admin123")
+    print("   Patient    : arjun@deepthi.com / password123")
+    print("   Admin      : admin@deepthi.com / admin123")
+    print("   HMS Admin  : admin@deepthihospitals.com / admin123")
+    print("   Doctor     : rajesh@deepthi.com / doctor123")
+    print("   Reception  : reception@deepthihospitals.com / admin123")
+    print("   Reception 2: reception2@deepthihospitals.com / admin123")
+    print("   Staff      : staff@deepthihospitals.com / admin123")
 
 
 if __name__ == "__main__":

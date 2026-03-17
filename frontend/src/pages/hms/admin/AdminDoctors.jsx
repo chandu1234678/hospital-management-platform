@@ -7,6 +7,10 @@ const DAYS = ['MON','TUE','WED','THU','FRI','SAT','SUN']
 const DAY_LABELS = { MON:'Monday',TUE:'Tuesday',WED:'Wednesday',THU:'Thursday',FRI:'Friday',SAT:'Saturday',SUN:'Sunday' }
 const BLANK_SCHEDULE = DAYS.map(d => ({ day_of_week: d, start_time: '09:00', end_time: '17:00', slot_duration_minutes: 30, is_active: false }))
 
+const BLANK_DOCTOR = { name: '', email: '', phone: '', password: 'Doctor@123', specialty: '', department: '', qualification: '', experience_years: '', consultation_fee: '500', bio: '' }
+
+const DEPARTMENTS = ['Cardiology','Neurology','Orthopedics','Pediatrics','Dermatology','Ophthalmology','General Medicine','Internal Medicine','Gynecology','Oncology','Radiology','Psychiatry','ENT','Urology','Nephrology']
+
 export default function AdminDoctors() {
   const [search, setSearch] = useState('')
   const [doctors, setDoctors] = useState([])
@@ -18,6 +22,9 @@ export default function AdminDoctors() {
   const [editDoc, setEditDoc] = useState(null)
   const [editForm, setEditForm] = useState({})
   const [savingEdit, setSavingEdit] = useState(false)
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState(BLANK_DOCTOR)
+  const [savingAdd, setSavingAdd] = useState(false)
 
   useEffect(() => {
     doctorService.getAll()
@@ -83,6 +90,29 @@ export default function AdminDoctors() {
     finally { setSavingEdit(false) }
   }
 
+  const handleAddDoctor = async () => {
+    if (!addForm.name || !addForm.email || !addForm.specialty || !addForm.department) {
+      toast.error('Name, email, specialty and department are required')
+      return
+    }
+    setSavingAdd(true)
+    try {
+      const created = await hmsService.createDoctor({
+        ...addForm,
+        experience_years: Number(addForm.experience_years) || 0,
+        consultation_fee: Number(addForm.consultation_fee) || 500,
+      })
+      setDoctors(ds => [...ds, created])
+      setShowAdd(false)
+      setAddForm(BLANK_DOCTOR)
+      toast.success(`Dr. ${created.name} added successfully`)
+    } catch (e) {
+      toast.error(e.message || 'Failed to add doctor')
+    } finally {
+      setSavingAdd(false)
+    }
+  }
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -90,6 +120,11 @@ export default function AdminDoctors() {
           <h1 className="text-2xl font-black text-slate-900">Doctor Management</h1>
           <p className="text-slate-500 text-sm">Manage medical staff and schedules</p>
         </div>
+        <button onClick={() => setShowAdd(true)}
+          className="flex items-center gap-2 px-5 py-2.5 bg-[#0f4b80] text-white rounded-xl text-sm font-semibold hover:bg-[#0d3f6e] transition-colors shadow-md shadow-blue-900/20 self-start sm:self-auto">
+          <span className="material-symbols-outlined text-lg">person_add</span>
+          Add Doctor
+        </button>
       </div>
 
       <div className="relative">
@@ -243,6 +278,66 @@ export default function AdminDoctors() {
             </button>
             <button onClick={() => setEditDoc(null)}
               className="flex-1 border border-slate-200 text-slate-700 font-bold py-2.5 rounded-lg hover:bg-slate-50">
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Add Doctor Modal */}
+      <Modal open={showAdd} onClose={() => { setShowAdd(false); setAddForm(BLANK_DOCTOR) }} title="Add New Doctor">
+        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {[
+              { label: 'Full Name', key: 'name', type: 'text', required: true, span: 2 },
+              { label: 'Email', key: 'email', type: 'email', required: true, span: 2 },
+              { label: 'Phone', key: 'phone', type: 'tel', span: 1 },
+              { label: 'Login Password', key: 'password', type: 'text', span: 1 },
+              { label: 'Qualification', key: 'qualification', type: 'text', span: 2 },
+              { label: 'Experience (years)', key: 'experience_years', type: 'number', span: 1 },
+              { label: 'Consultation Fee (₹)', key: 'consultation_fee', type: 'number', span: 1 },
+            ].map(f => (
+              <div key={f.key} className={f.span === 2 ? 'sm:col-span-2' : ''}>
+                <label className="text-xs font-semibold text-slate-600 block mb-1">
+                  {f.label} {f.required && <span className="text-red-500">*</span>}
+                </label>
+                <input type={f.type} value={addForm[f.key]||''}
+                  onChange={e => setAddForm(p => ({...p, [f.key]: e.target.value}))}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0f4b80] focus:ring-2 focus:ring-[#0f4b80]/20" />
+              </div>
+            ))}
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Specialty <span className="text-red-500">*</span></label>
+              <input value={addForm.specialty} onChange={e => setAddForm(p => ({...p, specialty: e.target.value}))}
+                placeholder="e.g. Senior Cardiologist"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0f4b80] focus:ring-2 focus:ring-[#0f4b80]/20" />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600 block mb-1">Department <span className="text-red-500">*</span></label>
+              <select value={addForm.department} onChange={e => setAddForm(p => ({...p, department: e.target.value}))}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0f4b80] bg-white">
+                <option value="">Select department...</option>
+                {DEPARTMENTS.map(d => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Bio</label>
+            <textarea value={addForm.bio} rows={2}
+              onChange={e => setAddForm(p => ({...p, bio: e.target.value}))}
+              placeholder="Brief professional bio..."
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-[#0f4b80] resize-none" />
+          </div>
+          <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+            <span className="font-bold">Note:</span> The doctor will be able to log in with their email and the password above via the HMS Staff portal.
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button onClick={handleAddDoctor} disabled={savingAdd}
+              className="flex-1 bg-[#0f4b80] text-white font-bold py-2.5 rounded-xl hover:bg-[#0d3f6e] disabled:opacity-60 transition-colors">
+              {savingAdd ? 'Adding...' : 'Add Doctor'}
+            </button>
+            <button onClick={() => { setShowAdd(false); setAddForm(BLANK_DOCTOR) }}
+              className="flex-1 border border-slate-200 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-50">
               Cancel
             </button>
           </div>

@@ -8,10 +8,17 @@ import { DEPARTMENTS } from '../data/mockData.js'
 
 function SkeletonCard() {
   return (
-    <div className="animate-pulse bg-white rounded-2xl border border-slate-100 p-6">
-      <div className="w-full aspect-3/4 bg-slate-200 rounded-xl mb-4" />
-      <div className="h-4 bg-slate-200 rounded w-3/4 mb-2" />
-      <div className="h-3 bg-slate-100 rounded w-1/2" />
+    <div className="animate-pulse bg-white rounded-2xl border border-slate-100 overflow-hidden">
+      <div className="w-full aspect-4/3 bg-slate-200" />
+      <div className="p-4 space-y-2">
+        <div className="h-4 bg-slate-200 rounded w-3/4" />
+        <div className="h-3 bg-slate-100 rounded w-1/2" />
+        <div className="h-3 bg-slate-100 rounded w-1/3 mt-1" />
+        <div className="flex gap-2 mt-3">
+          <div className="flex-1 h-8 bg-slate-100 rounded-lg" />
+          <div className="flex-1 h-8 bg-slate-200 rounded-lg" />
+        </div>
+      </div>
     </div>
   )
 }
@@ -73,30 +80,48 @@ export default function DoctorsPage() {
             <p className="text-slate-500">Try adjusting your search or filter</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {doctors.map(doc => (
-              <div key={doc.id} className="flex flex-col group">
-                <div className="relative overflow-hidden rounded-2xl mb-4 aspect-3/4 bg-slate-200">
-                  <img src={doc.image} alt={doc.name} className="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-500" />
-                  <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-[#0f4b80]/80 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div key={doc.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col group">
+                {/* Photo */}
+                <div className="relative overflow-hidden aspect-4/3 bg-slate-100">
+                  <img
+                    src={doc.image} alt={doc.name}
+                    className="w-full h-full object-cover object-top grayscale group-hover:grayscale-0 transition-all duration-500"
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-black/30 to-transparent" />
+                  {doc.department && (
+                    <span className="absolute top-3 left-3 bg-white/90 text-[#0f4b80] text-[10px] font-bold px-2.5 py-1 rounded-full">
+                      {doc.department}
+                    </span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="p-4 flex flex-col flex-1">
+                  <h3 className="text-slate-900 font-black text-base leading-tight">{doc.name}</h3>
+                  <p className="text-[#0f4b80] text-xs font-semibold mt-0.5">{doc.specialty}</p>
+
+                  <div className="flex items-center gap-1 mt-2">
+                    <span className="material-symbols-outlined text-yellow-400 text-sm">star</span>
+                    <span className="text-sm font-bold text-slate-700">{doc.rating}</span>
+                    <span className="text-slate-400 text-xs ml-0.5">({doc.reviews})</span>
+                    <span className="text-slate-300 mx-1">·</span>
+                    <span className="text-slate-500 text-xs">{doc.experience}</span>
+                  </div>
+
+                  {/* Always-visible actions */}
+                  <div className="flex gap-2 mt-4">
                     <Link to={`/doctors/${doc.id}`}
-                      className="bg-white text-[#0f4b80] px-4 py-2 rounded-lg font-bold text-sm w-full block text-center">
+                      className="flex-1 py-2 border border-[#0f4b80] text-[#0f4b80] text-xs font-bold rounded-lg hover:bg-[#0f4b80]/5 transition-colors text-center">
                       View Profile
+                    </Link>
+                    <Link to={`/book-appointment?doctor=${doc.id}`}
+                      className="flex-1 py-2 bg-[#0f4b80] text-white text-xs font-bold rounded-lg hover:opacity-90 transition-opacity text-center">
+                      Book
                     </Link>
                   </div>
                 </div>
-                <h3 className="text-slate-900 text-lg font-bold">{doc.name}</h3>
-                <p className="text-[#0f4b80] text-sm font-medium">{doc.specialty}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <span className="material-symbols-outlined text-yellow-400 text-sm">star</span>
-                  <span className="text-sm font-bold text-slate-700">{doc.rating}</span>
-                  <span className="text-slate-400 text-xs">({doc.reviews} reviews)</span>
-                </div>
-                <p className="text-slate-500 text-xs mt-1">{doc.experience} Experience</p>
-                <Link to={`/book-appointment?doctor=${doc.id}`}
-                  className="mt-3 px-4 py-2 bg-[#0f4b80] text-white text-sm font-bold rounded-lg hover:opacity-90 transition-opacity text-center">
-                  Book Appointment
-                </Link>
               </div>
             ))}
           </div>

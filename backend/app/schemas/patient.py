@@ -14,12 +14,15 @@ class PatientCreate(BaseModel):
 
 
 class PatientUpdate(PatientCreate):
-    pass
+    name: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class PatientResponse(BaseModel):
     id: int
     user_id: int
+    name: Optional[str] = None
+    phone: Optional[str] = None
     date_of_birth: Optional[str]
     gender: Optional[str]
     blood_group: Optional[str]
