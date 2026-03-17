@@ -138,7 +138,9 @@ export default function AdminBilling() {
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${STATUS_COLORS[inv.status] || 'bg-slate-100 text-slate-600'}`}>{inv.status}</span>
                     </td>
                     <td className="px-5 py-4">
-                      <button onClick={() => setViewInv(inv)} className="text-[#0f4b80] hover:underline text-xs font-bold">View</button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setViewInv(inv)} className="text-[#0f4b80] hover:underline text-xs font-bold">View</button>
+                      </div>
                     </td>
                   </tr>
                 ))}

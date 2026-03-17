@@ -15,6 +15,7 @@ from app.models.billing import Bill
 from app.models.bed import Bed
 from app.models.inventory import InventoryItem
 from app.models.lab_report import LabReport
+from app.models.prescription import Prescription
 
 
 # ── Admin: Create Doctor ──────────────────────────────────────────────────────
@@ -44,7 +45,7 @@ router = APIRouter(prefix="/admin", tags=["Admin"])
 
 
 @router.get("/stats")
-async def get_stats(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def get_stats(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     total_patients = (await db.execute(select(func.count()).select_from(Patient))).scalar()
     total_doctors = (await db.execute(select(func.count()).select_from(Doctor))).scalar()
     total_appointments = (await db.execute(select(func.count()).select_from(Appointment))).scalar()
@@ -110,7 +111,7 @@ async def create_doctor(data: AdminDoctorCreate, db: AsyncSession = Depends(get_
 
 
 @router.post("/appointments", status_code=201)
-async def admin_create_appointment(data: AdminAppointmentCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def admin_create_appointment(data: AdminAppointmentCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     # Verify patient and doctor exist
     patient = await db.execute(select(Patient).where(Patient.id == data.patient_id))
     if not patient.scalar_one_or_none():
@@ -154,7 +155,7 @@ async def admin_create_appointment(data: AdminAppointmentCreate, db: AsyncSessio
 
 
 @router.get("/appointments")
-async def get_all_appointments(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def get_all_appointments(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     result = await db.execute(select(Appointment))
     appointments = result.scalars().all()
 
@@ -192,7 +193,7 @@ async def get_all_appointments(db: AsyncSession = Depends(get_db), _: User = Dep
 
 
 @router.get("/patients")
-async def get_all_patients(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def get_all_patients(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     result = await db.execute(
         select(Patient, User).join(User, Patient.user_id == User.id)
     )
@@ -217,7 +218,7 @@ async def get_all_patients(db: AsyncSession = Depends(get_db), _: User = Depends
 
 
 @router.get("/billing")
-async def get_all_billing(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def get_all_billing(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     result = await db.execute(select(Bill))
     bills = result.scalars().all()
 
@@ -249,7 +250,7 @@ async def get_all_billing(db: AsyncSession = Depends(get_db), _: User = Depends(
 
 
 @router.get("/lab")
-async def get_all_lab_reports(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN"))):
+async def get_all_lab_reports(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
     result = await db.execute(select(LabReport))
     reports = result.scalars().all()
 
@@ -504,3 +505,38 @@ async def get_report_data(
         }
 
     return {"type": report_type, "period": period, "summary": {}, "rows": []}
+
+
+@router.get("/prescriptions")
+async def get_all_prescriptions(db: AsyncSession = Depends(get_db), _: User = Depends(require_roles("ADMIN", "RECEPTION"))):
+    result = await db.execute(select(Prescription))
+    prescriptions = result.scalars().all()
+
+    patient_ids = list({rx.patient_id for rx in prescriptions})
+    doctor_ids = list({rx.doctor_id for rx in prescriptions if rx.doctor_id})
+
+    patients_res = await db.execute(
+        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
+    )
+    patients_map = {p.id: u.name for p, u in patients_res.all()}
+
+    doctors_res = await db.execute(
+        select(Doctor, User).join(User, Doctor.user_id == User.id).where(Doctor.id.in_(doctor_ids))
+    )
+    doctors_map = {d.id: u.name for d, u in doctors_res.all()}
+
+    return [
+        {
+            "id": rx.id,
+            "patient_id": rx.patient_id,
+            "doctor_id": rx.doctor_id,
+            "patient": patients_map.get(rx.patient_id, "Unknown"),
+            "doctor": doctors_map.get(rx.doctor_id, "Unknown") if rx.doctor_id else "N/A",
+            "diagnosis": rx.diagnosis,
+            "medications": rx.medications,
+            "instructions": rx.instructions,
+            "status": rx.status,
+            "created_at": rx.created_at.isoformat() if rx.created_at else None,
+        }
+        for rx in prescriptions
+    ]

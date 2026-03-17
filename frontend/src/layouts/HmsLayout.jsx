@@ -230,8 +230,11 @@ function SidebarContent({ nav, onClose, user, role, onLogout }) {
   return (
     <div className="flex flex-col h-full">
       <div className="p-5 border-b border-slate-200 flex items-center gap-3">
-        <Logo height={36} />
-        <p className="text-slate-400 text-[10px] uppercase tracking-widest font-bold mt-0.5">HMS {role} Panel</p>
+        <Logo variant="icon" height={40} />
+        <div>
+          <p className="text-slate-900 text-base font-extrabold leading-none tracking-tight">Deepthi Hospitals</p>
+          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">HMS {role} Panel</p>
+        </div>
       </div>
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {nav.map(item => {

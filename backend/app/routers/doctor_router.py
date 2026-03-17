@@ -10,6 +10,8 @@ from app.models.doctor import Doctor
 from app.models.doctor_schedule import DoctorSchedule
 from app.models.appointment import Appointment
 from app.models.patient import Patient
+from app.models.prescription import Prescription
+from app.models.lab_report import LabReport
 
 
 class DoctorUpdate(BaseModel):
@@ -31,6 +33,12 @@ class ScheduleEntry(BaseModel):
     end_time: str
     slot_duration_minutes: int = 30
     is_active: bool = True
+
+
+class AppointmentStatusUpdate(BaseModel):
+    status: str
+    notes: Optional[str] = None
+
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
@@ -78,6 +86,8 @@ def _format_doctor(d: Doctor, u: User) -> dict:
     }
 
 
+# ── Public / Admin routes ─────────────────────────────────────────────────────
+
 @router.get("", response_model=list[dict])
 async def list_doctors(
     department: Optional[str] = Query(None),
@@ -88,13 +98,173 @@ async def list_doctors(
         q = q.where(Doctor.department == department)
     result = await db.execute(q)
     doctors = result.scalars().all()
-
     user_ids = [d.user_id for d in doctors]
     users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
     users_map = {u.id: u for u in users_result.scalars().all()}
-
     return [_format_doctor(d, users_map.get(d.user_id)) for d in doctors]
 
+
+# ── /me/* routes MUST come before /{doctor_id} ───────────────────────────────
+
+@router.get("/me/profile")
+async def get_my_profile(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+    doctor = doc_res.scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+    data = _format_doctor(doctor, current_user)
+    data["available_slots"] = doctor.available_slots
+    return data
+
+
+@router.get("/me/appointments")
+async def get_my_appointments(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+    doctor = doc_res.scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+
+    result = await db.execute(select(Appointment).where(Appointment.doctor_id == doctor.id))
+    appointments = result.scalars().all()
+
+    patient_ids = list({a.patient_id for a in appointments})
+    patients_res = await db.execute(
+        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
+    )
+    patients_map = {p.id: {"name": u.name, "phone": u.phone} for p, u in patients_res.all()}
+
+    return [
+        {
+            "id": a.id,
+            "patient_id": a.patient_id,
+            "patient": patients_map.get(a.patient_id, {}).get("name", "Unknown"),
+            "patient_phone": patients_map.get(a.patient_id, {}).get("phone", ""),
+            "department": a.department,
+            "appointment_date": a.appointment_date,
+            "appointment_time": a.appointment_time,
+            "reason": a.reason,
+            "status": a.status,
+            "token_number": a.token_number,
+            "notes": a.notes,
+        }
+        for a in appointments
+    ]
+
+
+@router.get("/me/patients")
+async def get_my_patients(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+    doctor = doc_res.scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+
+    result = await db.execute(
+        select(Appointment.patient_id).where(Appointment.doctor_id == doctor.id).distinct()
+    )
+    patient_ids = [row[0] for row in result.all()]
+    if not patient_ids:
+        return []
+
+    patients_res = await db.execute(
+        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
+    )
+    return [
+        {
+            "id": p.id,
+            "name": u.name,
+            "email": u.email,
+            "phone": u.phone,
+            "gender": p.gender,
+            "blood_group": p.blood_group,
+            "date_of_birth": p.date_of_birth,
+            "allergies": p.allergies,
+        }
+        for p, u in patients_res.all()
+    ]
+
+
+@router.get("/me/prescriptions")
+async def get_my_prescriptions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+    doctor = doc_res.scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+
+    result = await db.execute(select(Prescription).where(Prescription.doctor_id == doctor.id))
+    prescriptions = result.scalars().all()
+
+    patient_ids = list({p.patient_id for p in prescriptions})
+    patients_res = await db.execute(
+        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
+    )
+    patients_map = {p.id: u.name for p, u in patients_res.all()}
+
+    return [
+        {
+            "id": rx.id,
+            "patient_id": rx.patient_id,
+            "patient": patients_map.get(rx.patient_id, "Unknown"),
+            "doctor_id": rx.doctor_id,
+            "diagnosis": rx.diagnosis,
+            "medications": rx.medications,
+            "instructions": rx.instructions,
+            "status": rx.status,
+            "created_at": rx.created_at.isoformat() if rx.created_at else None,
+        }
+        for rx in prescriptions
+    ]
+
+
+@router.get("/me/lab-reports")
+async def get_my_lab_reports(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+    doctor = doc_res.scalar_one_or_none()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor profile not found")
+
+    result = await db.execute(select(LabReport).where(LabReport.doctor_id == doctor.id))
+    reports = result.scalars().all()
+
+    patient_ids = list({r.patient_id for r in reports})
+    patients_res = await db.execute(
+        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
+    )
+    patients_map = {p.id: u.name for p, u in patients_res.all()}
+
+    return [
+        {
+            "id": r.id,
+            "patient_id": r.patient_id,
+            "patient": patients_map.get(r.patient_id, "Unknown"),
+            "doctor_id": r.doctor_id,
+            "test_name": r.test_name,
+            "test_type": r.test_type,
+            "results": r.results,
+            "report_date": r.report_date,
+            "status": r.status,
+            "remarks": r.remarks,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in reports
+    ]
+
+
+# ── /{doctor_id} routes ───────────────────────────────────────────────────────
 
 @router.get("/{doctor_id}", response_model=dict)
 async def get_doctor(doctor_id: int, db: AsyncSession = Depends(get_db)):
@@ -122,13 +292,11 @@ async def update_doctor(
         raise HTTPException(status_code=404, detail="Doctor not found")
     user_result = await db.execute(select(User).where(User.id == d.user_id))
     u = user_result.scalar_one_or_none()
-    # Update doctor fields
     for k, v in data.model_dump(exclude_none=True).items():
         if k in ("name", "phone"):
             continue
         if hasattr(d, k):
             setattr(d, k, v)
-    # Update user fields
     if data.name and u:
         u.name = data.name
     if data.phone and u:
@@ -171,12 +339,9 @@ async def set_doctor_schedule(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_roles("ADMIN")),
 ):
-    """Replace all schedule entries for a doctor."""
-    # Delete existing
     existing = await db.execute(select(DoctorSchedule).where(DoctorSchedule.doctor_id == doctor_id))
     for s in existing.scalars().all():
         await db.delete(s)
-    # Insert new
     new_schedules = []
     for e in entries:
         s = DoctorSchedule(
@@ -206,76 +371,43 @@ async def set_doctor_schedule(
     ]
 
 
-@router.get("/me/appointments")
-async def get_my_appointments(
+# ── Appointment status updates (shared by doctor + reception) ─────────────────
+
+@router.patch("/appointments/{appointment_id}")
+async def update_appointment_status(
+    appointment_id: int,
+    data: AppointmentStatusUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get appointments for the logged-in doctor."""
-    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
-    doctor = doc_res.scalar_one_or_none()
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor profile not found")
-
-    result = await db.execute(select(Appointment).where(Appointment.doctor_id == doctor.id))
-    appointments = result.scalars().all()
-
-    patient_ids = list({a.patient_id for a in appointments})
-    patients_res = await db.execute(
-        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
-    )
-    patients_map = {p.id: {"name": u.name, "phone": u.phone} for p, u in patients_res.all()}
-
-    return [
-        {
-            "id": a.id,
-            "patient_id": a.patient_id,
-            "patient": patients_map.get(a.patient_id, {}).get("name", "Unknown"),
-            "patient_phone": patients_map.get(a.patient_id, {}).get("phone", ""),
-            "department": a.department,
-            "appointment_date": a.appointment_date,
-            "appointment_time": a.appointment_time,
-            "reason": a.reason,
-            "status": a.status,
-            "token_number": a.token_number,
-            "notes": a.notes,
-        }
-        for a in appointments
-    ]
+    result = await db.execute(select(Appointment).where(Appointment.id == appointment_id))
+    appt = result.scalar_one_or_none()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    if current_user.role == "DOCTOR":
+        doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+        doctor = doc_res.scalar_one_or_none()
+        if not doctor or appt.doctor_id != doctor.id:
+            raise HTTPException(status_code=403, detail="Not authorized")
+    appt.status = data.status.upper()
+    if data.notes:
+        appt.notes = data.notes
+    await db.commit()
+    await db.refresh(appt)
+    return {"id": appt.id, "status": appt.status, "notes": appt.notes}
 
 
-@router.get("/me/patients")
-async def get_my_patients(
+@router.patch("/appointments/{appointment_id}/checkin")
+async def checkin_appointment(
+    appointment_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    _: User = Depends(require_roles("ADMIN", "RECEPTION")),
 ):
-    """Get unique patients seen by the logged-in doctor."""
-    doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
-    doctor = doc_res.scalar_one_or_none()
-    if not doctor:
-        raise HTTPException(status_code=404, detail="Doctor profile not found")
-
-    result = await db.execute(
-        select(Appointment.patient_id).where(Appointment.doctor_id == doctor.id).distinct()
-    )
-    patient_ids = [row[0] for row in result.all()]
-
-    if not patient_ids:
-        return []
-
-    patients_res = await db.execute(
-        select(Patient, User).join(User, Patient.user_id == User.id).where(Patient.id.in_(patient_ids))
-    )
-    return [
-        {
-            "id": p.id,
-            "name": u.name,
-            "email": u.email,
-            "phone": u.phone,
-            "gender": p.gender,
-            "blood_group": p.blood_group,
-            "date_of_birth": p.date_of_birth,
-            "allergies": p.allergies,
-        }
-        for p, u in patients_res.all()
-    ]
+    result = await db.execute(select(Appointment).where(Appointment.id == appointment_id))
+    appt = result.scalar_one_or_none()
+    if not appt:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+    appt.status = "CONFIRMED"
+    await db.commit()
+    await db.refresh(appt)
+    return {"id": appt.id, "status": appt.status}

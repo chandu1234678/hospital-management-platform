@@ -37,6 +37,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import HmsPortalPage from './pages/hms/HmsPortalPage.jsx'
 import HmsLoginPage from './pages/hms/HmsLoginPage.jsx'
 import HmsForgotPassword from './pages/hms/HmsForgotPassword.jsx'
+import HmsResetPassword from './pages/hms/HmsResetPassword.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
 import DoctorHmsLayout from './layouts/DoctorHmsLayout.jsx'
 import ReceptionLayout from './layouts/ReceptionLayout.jsx'
@@ -139,6 +140,7 @@ export default function App() {
 
         {/* HMS Forgot Password */}
         <Route path="/hms/:role/forgot-password" element={<HmsForgotPassword />} />
+        <Route path="/hms/:role/reset-password" element={<HmsResetPassword />} />
 
         {/* HMS Admin Portal */}
         <Route element={<AdminLayout />}>

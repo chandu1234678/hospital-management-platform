@@ -394,6 +394,26 @@ export const hmsService = {
     return []
   },
 
+  async updateBill(id, data) {
+    if (BASE_URL) return http('PATCH', `/billing/${id}`, data, getHmsToken())
+    return { id, ...data }
+  },
+
+  async createPaymentOrder(billId) {
+    if (BASE_URL) return http('POST', `/billing/${billId}/pay`, null, getHmsToken())
+    return {}
+  },
+
+  async verifyPayment(billId, data) {
+    if (BASE_URL) return http('POST', `/billing/${billId}/verify`, data, getHmsToken())
+    return {}
+  },
+
+  async completeAppointment(id) {
+    if (BASE_URL) return http('PATCH', `/doctors/appointments/${id}`, { status: 'COMPLETED' }, getHmsToken())
+    return { id, status: 'COMPLETED' }
+  },
+
   async getLabQueue() {
     if (BASE_URL) return http('GET', '/admin/lab', null, getHmsToken())
     return []
@@ -494,5 +514,40 @@ export const hmsService = {
   async getDoctorPatients() {
     if (BASE_URL) return http('GET', '/doctors/me/patients', null, getHmsToken())
     return []
+  },
+
+  async getDoctorProfile() {
+    if (BASE_URL) return http('GET', '/doctors/me/profile', null, getHmsToken())
+    return null
+  },
+
+  async getDoctorPrescriptions() {
+    if (BASE_URL) return http('GET', '/doctors/me/prescriptions', null, getHmsToken())
+    return []
+  },
+
+  async getDoctorLabReports() {
+    if (BASE_URL) return http('GET', '/doctors/me/lab-reports', null, getHmsToken())
+    return []
+  },
+
+  async updateAppointmentStatus(id, status, notes) {
+    if (BASE_URL) return http('PATCH', `/doctors/appointments/${id}`, { status, notes }, getHmsToken())
+    return { id, status }
+  },
+
+  async checkinAppointment(id) {
+    if (BASE_URL) return http('PATCH', `/doctors/appointments/${id}/checkin`, {}, getHmsToken())
+    return { id, status: 'CONFIRMED' }
+  },
+
+  async getPrescriptions() {
+    if (BASE_URL) return http('GET', '/admin/prescriptions', null, getHmsToken())
+    return []
+  },
+
+  async createPrescription(data) {
+    if (BASE_URL) return http('POST', '/prescriptions', data, getHmsToken())
+    return { id: Date.now(), ...data, status: 'ACTIVE' }
   },
 }

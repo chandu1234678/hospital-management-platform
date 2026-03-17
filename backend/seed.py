@@ -21,6 +21,7 @@ from app.models.prescription import Prescription
 from app.models.lab_report import LabReport
 from app.models.inventory import InventoryItem
 from app.models.bed import Bed
+from app.models.doctor_schedule import DoctorSchedule
 
 engine = create_async_engine(settings.DATABASE_URL, echo=False)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -383,6 +384,134 @@ async def seed():
                                      remarks="Scheduled — awaiting scan"))
                 await db.commit()
                 print("✓ Lab reports")
+
+        # ── Doctor Schedules ─────────────────────────────────────────────────────
+        res = await db.execute(select(DoctorSchedule))
+        if not res.scalars().all():
+            days = ["MON", "TUE", "WED", "THU", "FRI"]
+            for doc_email, start, end in [
+                ("rajesh@deepthi.com",  "09:00", "17:00"),
+                ("priya@deepthi.com",   "10:00", "18:00"),
+                ("anil@deepthi.com",    "08:00", "16:00"),
+                ("sarah@deepthi.com",   "09:00", "15:00"),
+                ("meena@deepthi.com",   "10:00", "17:00"),
+                ("vikram@deepthi.com",  "09:00", "16:00"),
+                ("ananya@deepthi.com",  "10:00", "15:00"),
+                ("suresh@deepthi.com",  "09:30", "17:30"),
+                ("kavitha@deepthi.com", "10:00", "18:00"),
+                ("ramesh@deepthi.com",  "08:00", "14:00"),
+            ]:
+                doc_id = doctor_ids.get(doc_email)
+                if not doc_id:
+                    continue
+                for day in days:
+                    db.add(DoctorSchedule(doctor_id=doc_id, day_of_week=day,
+                                          start_time=start, end_time=end,
+                                          slot_duration_minutes=30, is_active=True))
+            await db.commit()
+            print("✓ Doctor schedules")
+
+        # ── More today's appointments for Rajesh (so doctor dashboard is populated) ──
+        raj_id = doctor_ids.get("rajesh@deepthi.com")
+        if raj_id:
+            from datetime import date as _date
+            today_str = str(_date.today())
+            extra_today = [
+                ("priya.nair@gmail.com",   "09:00 AM", "Chest pain evaluation",    "SCHEDULED"),
+                ("vikram.singh@gmail.com", "10:30 AM", "Post-stent follow-up",     "COMPLETED"),
+                ("arun.patel@gmail.com",   "12:00 PM", "ECG review",               "COMPLETED"),
+                ("suresh.reddy@gmail.com", "02:00 PM", "Hypertension management",  "SCHEDULED"),
+                ("deepa.k@gmail.com",      "03:30 PM", "Cardiac screening",        "SCHEDULED"),
+            ]
+            for p_email, time_slot, reason, status in extra_today:
+                pat_id = extra_patient_ids.get(p_email)
+                if not pat_id:
+                    continue
+                res = await db.execute(select(Appointment).where(
+                    Appointment.patient_id == pat_id,
+                    Appointment.doctor_id == raj_id,
+                    Appointment.appointment_date == today_str,
+                    Appointment.appointment_time == time_slot,
+                ))
+                if res.scalar_one_or_none():
+                    continue
+                appt = Appointment(patient_id=pat_id, doctor_id=raj_id,
+                                   appointment_date=today_str, appointment_time=time_slot,
+                                   department="Cardiology", reason=reason,
+                                   status=status, token_number=1)
+                db.add(appt)
+                await db.flush()
+                paid_status = "PAID" if status == "COMPLETED" else "PENDING"
+                db.add(Bill(patient_id=pat_id, appointment_id=appt.id,
+                            bill_number=f"BILL-RAJ-{appt.id:04d}",
+                            items=json.dumps([{"name": "Consultation - Cardiology", "qty": 1, "price": 1500}]),
+                            subtotal=1500, tax=0, discount=0, total=1500,
+                            status=paid_status,
+                            payment_method="RAZORPAY" if paid_status == "PAID" else None,
+                            paid_at=f"{today_str}T10:00:00" if paid_status == "PAID" else None))
+            await db.commit()
+            print("✓ Extra today's appointments for Rajesh")
+
+        # ── Prescriptions per doctor ─────────────────────────────────────────────
+        for p_email, doc_email, diagnosis, meds, instructions, valid_until, status in [
+            ("priya.nair@gmail.com",   "rajesh@deepthi.com",  "Hypertension",
+             [{"name": "Amlodipine", "dosage": "5mg", "form": "Tablet", "instructions": "Once daily", "refills": 3},
+              {"name": "Aspirin",    "dosage": "75mg","form": "Tablet", "instructions": "Once daily after dinner", "refills": 3}],
+             "Monitor BP daily. Low-salt diet.", "2026-09-01", "ACTIVE"),
+            ("vikram.singh@gmail.com", "rajesh@deepthi.com",  "Post-Cardiac Stent Care",
+             [{"name": "Clopidogrel", "dosage": "75mg", "form": "Tablet", "instructions": "Once daily", "refills": 6},
+              {"name": "Atorvastatin","dosage": "40mg", "form": "Tablet", "instructions": "At bedtime", "refills": 6}],
+             "Avoid strenuous activity. Follow-up in 1 month.", "2026-09-01", "ACTIVE"),
+            ("kavitha.m@gmail.com",    "priya@deepthi.com",   "Migraine",
+             [{"name": "Sumatriptan", "dosage": "50mg", "form": "Tablet", "instructions": "As needed, max 2/day", "refills": 2}],
+             "Rest in dark room during episodes.", "2026-06-01", "ACTIVE"),
+            ("arun.patel@gmail.com",   "anil@deepthi.com",    "Knee Osteoarthritis",
+             [{"name": "Diclofenac",  "dosage": "50mg", "form": "Tablet", "instructions": "Twice daily after meals", "refills": 1},
+              {"name": "Calcium+D3",  "dosage": "500mg","form": "Tablet", "instructions": "Once daily", "refills": 3}],
+             "Physiotherapy 3x/week. Avoid stairs.", "2026-07-01", "ACTIVE"),
+            ("suresh.reddy@gmail.com", "ramesh@deepthi.com",  "Type 2 Diabetes",
+             [{"name": "Metformin",   "dosage": "500mg","form": "Tablet", "instructions": "Twice daily with meals", "refills": 6},
+              {"name": "Glipizide",   "dosage": "5mg",  "form": "Tablet", "instructions": "Once daily before breakfast", "refills": 3}],
+             "Monitor blood sugar daily. Low-carb diet.", "2026-09-01", "ACTIVE"),
+        ]:
+            pat_id = extra_patient_ids.get(p_email)
+            doc_id = doctor_ids.get(doc_email)
+            if not pat_id or not doc_id:
+                continue
+            res = await db.execute(select(Prescription).where(
+                Prescription.patient_id == pat_id, Prescription.doctor_id == doc_id,
+                Prescription.diagnosis == diagnosis))
+            if not res.scalar_one_or_none():
+                db.add(Prescription(patient_id=pat_id, doctor_id=doc_id, diagnosis=diagnosis,
+                                    medications=json.dumps(meds), instructions=instructions,
+                                    valid_until=valid_until, status=status))
+        await db.commit()
+        print("✓ Prescriptions per doctor")
+
+        # ── Lab reports per doctor ───────────────────────────────────────────────
+        from datetime import date as _date2, timedelta as _td
+        _today = str(_date2.today())
+        for p_email, doc_email, test, ttype, rdate, status, remarks in [
+            ("priya.nair@gmail.com",   "rajesh@deepthi.com", "Lipid Profile",      "Biochemistry", _today,                          "COMPLETED", "LDL slightly elevated. Dietary changes advised."),
+            ("vikram.singh@gmail.com", "rajesh@deepthi.com", "Echocardiogram",     "Cardiac",      str(_date2.today()-_td(days=1)), "COMPLETED", "EF 55% — normal. No wall motion abnormality."),
+            ("kavitha.m@gmail.com",    "priya@deepthi.com",  "EEG",                "Neurology",    str(_date2.today()-_td(days=1)), "PENDING",   "Awaiting analysis"),
+            ("arun.patel@gmail.com",   "anil@deepthi.com",   "Knee X-Ray",         "Radiology",    str(_date2.today()-_td(days=2)), "COMPLETED", "Grade 2 osteoarthritis. Physiotherapy recommended."),
+            ("suresh.reddy@gmail.com", "ramesh@deepthi.com", "HbA1c",              "Biochemistry", _today,                          "COMPLETED", "HbA1c 7.2% — controlled. Continue medication."),
+            ("deepa.k@gmail.com",      "meena@deepthi.com",  "Skin Biopsy",        "Pathology",    str(_date2.today()-_td(days=3)), "COMPLETED", "Benign lesion. No further action needed."),
+            ("rahul.sharma@gmail.com", "anil@deepthi.com",   "MRI Knee",           "Radiology",    _today,                          "PENDING",   "Scan scheduled — awaiting results"),
+            ("sneha.iyer@gmail.com",   "sarah@deepthi.com",  "CBC",                "Blood Test",   _today,                          "COMPLETED", "All values within normal range."),
+        ]:
+            pat_id = extra_patient_ids.get(p_email)
+            doc_id = doctor_ids.get(doc_email)
+            if not pat_id or not doc_id:
+                continue
+            res = await db.execute(select(LabReport).where(
+                LabReport.patient_id == pat_id, LabReport.test_name == test))
+            if not res.scalar_one_or_none():
+                db.add(LabReport(patient_id=pat_id, doctor_id=doc_id, test_name=test,
+                                 test_type=ttype, report_date=rdate, status=status, remarks=remarks))
+        await db.commit()
+        print("✓ Lab reports per doctor")
 
     print("\n✅ Seed complete!")
     print("   Patient    : arjun@deepthi.com / password123")
