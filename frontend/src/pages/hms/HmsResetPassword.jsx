@@ -189,7 +189,7 @@ export default function HmsResetPassword() {
 
           {/* ── Visual Side ── */}
           <div className="hidden md:flex w-1/2 relative bg-[#0f4b80] overflow-hidden flex-col items-center justify-center p-10 text-center text-white">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#0f4b80] via-[#0f4b80] to-[#08345a]" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#0f4b80] via-[#0f4b80] to-[#08345a]" />
             <div className="absolute inset-0 opacity-10">
               <div className="absolute top-[-10%] left-[-10%] w-full h-full bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.4)_0%,transparent_60%)]" />
             </div>

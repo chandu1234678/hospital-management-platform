@@ -44,8 +44,8 @@ export default function ReceptionRegistration() {
   const onSubmit = async (data) => {
     setSubmitting(true)
     try {
-      // 1. Register patient
-      const patient = await hmsService.createPatient({
+      // 1. Register patient (returns user object)
+      const user = await hmsService.createPatient({
         name: data.name,
         email: data.email,
         phone: data.phone,
@@ -57,9 +57,16 @@ export default function ReceptionRegistration() {
         emergency_contact: data.emergency_contact,
       })
 
-      // 2. Create appointment
+      // 2. Fetch the patient profile to get the patient ID (not user ID)
+      const patients = await hmsService.getPatients()
+      const patient = patients.find(p => p.user_id === user.id || p.email === data.email)
+      const patientId = patient?.id
+
+      if (!patientId) throw new Error('Patient profile not found after registration')
+
+      // 3. Create appointment
       await hmsService.createAppointment({
-        patient_id: patient.id || patient.patient_id,
+        patient_id: patientId,
         doctor_id: Number(data.doctor_id),
         appointment_date: data.appointment_date,
         appointment_time: data.appointment_time,
@@ -67,7 +74,7 @@ export default function ReceptionRegistration() {
         reason: data.reason,
       })
 
-      setSuccess({ name: data.name, id: patient.id || patient.patient_id })
+      setSuccess({ name: data.name, id: patientId })
       reset()
     } catch (err) {
       toast.error(err.message || 'Registration failed')

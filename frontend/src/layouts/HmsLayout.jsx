@@ -58,13 +58,17 @@ function ProfileDropdown({ user, role, onLogout, dashboardPath }) {
               Dashboard
             </button>
             <button
-              onClick={() => { navigate(`${dashboardPath.replace('/dashboard', '/settings')}`); setOpen(false) }}
+              onClick={() => {
+                const settingsPath = dashboardPath.replace('/dashboard', '/settings')
+                // Only navigate to settings if the route exists (admin only)
+                navigate(dashboardPath.includes('/admin/') ? settingsPath : dashboardPath)
+                setOpen(false)
+              }}
               className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <span className="material-symbols-outlined text-[18px] text-slate-400">manage_accounts</span>
               Profile & Settings
-            </button>
-          </div>
+            </button>          </div>
 
           <div className="border-t border-slate-100 py-1.5">
             <button

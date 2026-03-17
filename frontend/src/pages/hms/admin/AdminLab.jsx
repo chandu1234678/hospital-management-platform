@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { hmsService } from '../../../services/api.js'
+import { hmsService, doctorService } from '../../../services/api.js'
 
 const STATUS_COLORS = {
   PROCESSING: 'bg-blue-100 text-blue-700',
@@ -26,17 +26,13 @@ export default function AdminLab() {
     Promise.all([
       hmsService.getLabQueue(),
       hmsService.getPatients(),
-    ]).then(([lab, pts]) => {
+      doctorService.getAll(),
+    ]).then(([lab, pts, docs]) => {
       setQueue(lab)
       setPatients(pts)
+      setDoctors(docs)
     }).catch(() => toast.error('Failed to load lab data'))
       .finally(() => setLoading(false))
-
-    // load doctors list
-    const token = localStorage.getItem('hms-token')
-    fetch(`${import.meta.env.VITE_API_URL}/doctors`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
-    }).then(r => r.json()).then(setDoctors).catch(() => {})
   }, [])
 
   const filtered = queue.filter(l =>

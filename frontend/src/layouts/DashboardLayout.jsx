@@ -28,7 +28,12 @@ function Sidebar({ onClose }) {
     <div className="flex flex-col h-full">
       <div className="p-5 flex items-center gap-2 border-b border-slate-100">
         <Link to="/" onClick={onClose}><Logo height={34} /></Link>
-        <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">My Health</p>
+        <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex-1">My Health</p>
+        {onClose && (
+          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        )}
       </div>
       <div className="px-4 py-4 border-b border-slate-100">
         <div className="flex items-center gap-3">
@@ -73,7 +78,11 @@ function Sidebar({ onClose }) {
 
 export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [drawerVisible, setDrawerVisible] = useState(false)
   const location = useLocation()
+
+  const openDrawer = () => { setMobileOpen(true); requestAnimationFrame(() => setDrawerVisible(true)) }
+  const closeDrawer = () => { setDrawerVisible(false); setTimeout(() => setMobileOpen(false), 300) }
 
   return (
     <div className="flex min-h-screen bg-[#f6f7f8]">
@@ -87,17 +96,20 @@ export default function DashboardLayout() {
         <div className="flex items-center gap-2">
           <Link to="/"><Logo height={30} /></Link>
         </div>
-        <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg hover:bg-slate-100">
+        <button onClick={openDrawer} className="p-2 rounded-lg hover:bg-slate-100">
           <span className="material-symbols-outlined">menu</span>
         </button>
       </div>
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 bg-white flex flex-col h-full shadow-xl">
-            <Sidebar onClose={() => setMobileOpen(false)} />
+        <div className="md:hidden fixed inset-0 z-50 flex justify-end">
+          <div
+            className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${drawerVisible ? 'opacity-100' : 'opacity-0'}`}
+            onClick={closeDrawer}
+          />
+          <aside className={`relative w-64 bg-white flex flex-col h-full shadow-xl transition-transform duration-300 ${drawerVisible ? 'translate-x-0' : 'translate-x-full'}`}>
+            <Sidebar onClose={closeDrawer} />
           </aside>
         </div>
       )}

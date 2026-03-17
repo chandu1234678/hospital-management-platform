@@ -42,18 +42,18 @@ class AppointmentStatusUpdate(BaseModel):
 
 router = APIRouter(prefix="/doctors", tags=["Doctors"])
 
-# Doctor image map — keyed by email
+# Doctor image map — keyed by email (matches public DoctorsPage mockData photos)
 DOCTOR_IMAGES = {
-    "rajesh@deepthi.com":  "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80",
-    "priya@deepthi.com":   "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=400&q=80",
-    "anil@deepthi.com":    "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=400&q=80",
-    "sarah@deepthi.com":   "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=400&q=80",
-    "meena@deepthi.com":   "https://images.unsplash.com/photo-1527613426441-4da17471b66d?w=400&q=80",
-    "vikram@deepthi.com":  "https://images.unsplash.com/photo-1537368910025-700350fe46c7?w=400&q=80",
-    "ananya@deepthi.com":  "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?w=400&q=80",
-    "suresh@deepthi.com":  "https://images.unsplash.com/photo-1582750433449-648ed127bb54?w=400&q=80",
-    "kavitha@deepthi.com": "https://images.unsplash.com/photo-1614608682850-e0d6ed316d47?w=400&q=80",
-    "ramesh@deepthi.com":  "https://images.unsplash.com/photo-1559757175-0eb30cd8c063?w=400&q=80",
+    "rajesh@deepthi.com":  "https://lh3.googleusercontent.com/aida-public/AB6AXuCeSntqcAIlZ-Abr2lTid8uZE38mwRK0kAKdNOJBzCNABbLHRWaWAxcOdC657_rG6lQ0aH8P9TG2gytBsfd3TaArn5vVbxJgfmdAiC8Ggk22RSdvGbUANCYiVtP_iMXNnsYcmRlYFKgYF4HP3dQrx7--bpbiQQazzLGy48z4o6suE0YkMUvLaBWvjxCxrp3ZeinKMzTCEWPJW4UAnZMKUYw3ipCD-UhAE4rZ3MX9lo5KIXPh6VlIwworS7U9LCpT4QcQXmFlsLdS4uZ",
+    "priya@deepthi.com":   "https://lh3.googleusercontent.com/aida-public/AB6AXuCW3qS93lRJCF4fo7fMWZmq7UwUHE2rNwNnrpKqL5tY1pdhnlxUQFFGK-Mg48ZYSDyclLhUR6O6jG4XIrQ8R1TFW-paYiz8PG1jLSZT_9QcErisN1l6JUDX65-htnGLjgctc0-tRufpuqOo2WTJL0Q7eO9xF41ypgIu48DVzNYW3VL3jbTkjn4izZoCHUkPLsb22yfeWRLdRxO4nzBXz9RRXQbY_bZt1AKrdeWETwvNVGAcPW0LZcmYYLHbIWoc7SABhgfqrOycBoJS",
+    "anil@deepthi.com":    "https://lh3.googleusercontent.com/aida-public/AB6AXuA7a9z1gZbe5_QTNMoaiATWkcEv-eq4ksBTPZtyBJbYpAdhW8_oGtCKcM7VYO-rcw_BLrSOajSRUFIx_wi6_LkOfI0JoEpOw7XlmBwe6UZzrZivcEkctJlyJuWYHThX3mwKTzyBVrkBDE-SoIJcWcCZKQfcFX5CDsYuqhWliAT09-b_aFtIIFyzaLPoDcFgAv7XOhbNsbJ62v0HW4-2KEwiJLd_bpS-QnzCRGv9NnGNcg5h33xaaYSemGNpmz66iNNW9B4jw0VNwy-Y",
+    "sarah@deepthi.com":   "https://lh3.googleusercontent.com/aida-public/AB6AXuBdjBXvmVGVTwZ3qnXtuCEbbYdHt7kNQpGZn0YISJRNodb5y8R2urc3CugsDKX_bSwnCplglb2XRgm41V158H8MGFK4TbRyICflMrnxJmU_TMwdta9l88z-iIU4ZR8JNc4CrcpRkapYgsdtFLK03GF4NoaQTFab1AOKEU4YD4GFKOHiKvO7n2PXIIbzVh2LOiDHPOHTWrAAW69aJo3TM0ygGafye_sM8mS3ndAKjpZANJqfWOX42xzfOgOb9ZhwHhwcizVuRJG3U312",
+    "meena@deepthi.com":   "https://lh3.googleusercontent.com/aida-public/AB6AXuCW3qS93lRJCF4fo7fMWZmq7UwUHE2rNwNnrpKqL5tY1pdhnlxUQFFGK-Mg48ZYSDyclLhUR6O6jG4XIrQ8R1TFW-paYiz8PG1jLSZT_9QcErisN1l6JUDX65-htnGLjgctc0-tRufpuqOo2WTJL0Q7eO9xF41ypgIu48DVzNYW3VL3jbTkjn4izZoCHUkPLsb22yfeWRLdRxO4nzBXz9RRXQbY_bZt1AKrdeWETwvNVGAcPW0LZcmYYLHbIWoc7SABhgfqrOycBoJS",
+    "vikram@deepthi.com":  "https://lh3.googleusercontent.com/aida-public/AB6AXuCeSntqcAIlZ-Abr2lTid8uZE38mwRK0kAKdNOJBzCNABbLHRWaWAxcOdC657_rG6lQ0aH8P9TG2gytBsfd3TaArn5vVbxJgfmdAiC8Ggk22RSdvGbUANCYiVtP_iMXNnsYcmRlYFKgYF4HP3dQrx7--bpbiQQazzLGy48z4o6suE0YkMUvLaBWvjxCxrp3ZeinKMzTCEWPJW4UAnZMKUYw3ipCD-UhAE4rZ3MX9lo5KIXPh6VlIwworS7U9LCpT4QcQXmFlsLdS4uZ",
+    "ananya@deepthi.com":  "https://lh3.googleusercontent.com/aida-public/AB6AXuBdjBXvmVGVTwZ3qnXtuCEbbYdHt7kNQpGZn0YISJRNodb5y8R2urc3CugsDKX_bSwnCplglb2XRgm41V158H8MGFK4TbRyICflMrnxJmU_TMwdta9l88z-iIU4ZR8JNc4CrcpRkapYgsdtFLK03GF4NoaQTFab1AOKEU4YD4GFKOHiKvO7n2PXIIbzVh2LOiDHPOHTWrAAW69aJo3TM0ygGafye_sM8mS3ndAKjpZANJqfWOX42xzfOgOb9ZhwHhwcizVuRJG3U312",
+    "suresh@deepthi.com":  "https://lh3.googleusercontent.com/aida-public/AB6AXuA7a9z1gZbe5_QTNMoaiATWkcEv-eq4ksBTPZtyBJbYpAdhW8_oGtCKcM7VYO-rcw_BLrSOajSRUFIx_wi6_LkOfI0JoEpOw7XlmBwe6UZzrZivcEkctJlyJuWYHThX3mwKTzyBVrkBDE-SoIJcWcCZKQfcFX5CDsYuqhWliAT09-b_aFtIIFyzaLPoDcFgAv7XOhbNsbJ62v0HW4-2KEwiJLd_bpS-QnzCRGv9NnGNcg5h33xaaYSemGNpmz66iNNW9B4jw0VNwy-Y",
+    "kavitha@deepthi.com": "https://lh3.googleusercontent.com/aida-public/AB6AXuCW3qS93lRJCF4fo7fMWZmq7UwUHE2rNwNnrpKqL5tY1pdhnlxUQFFGK-Mg48ZYSDyclLhUR6O6jG4XIrQ8R1TFW-paYiz8PG1jLSZT_9QcErisN1l6JUDX65-htnGLjgctc0-tRufpuqOo2WTJL0Q7eO9xF41ypgIu48DVzNYW3VL3jbTkjn4izZoCHUkPLsb22yfeWRLdRxO4nzBXz9RRXQbY_bZt1AKrdeWETwvNVGAcPW0LZcmYYLHbIWoc7SABhgfqrOycBoJS",
+    "ramesh@deepthi.com":  "https://lh3.googleusercontent.com/aida-public/AB6AXuCeSntqcAIlZ-Abr2lTid8uZE38mwRK0kAKdNOJBzCNABbLHRWaWAxcOdC657_rG6lQ0aH8P9TG2gytBsfd3TaArn5vVbxJgfmdAiC8Ggk22RSdvGbUANCYiVtP_iMXNnsYcmRlYFKgYF4HP3dQrx7--bpbiQQazzLGy48z4o6suE0YkMUvLaBWvjxCxrp3ZeinKMzTCEWPJW4UAnZMKUYw3ipCD-UhAE4rZ3MX9lo5KIXPh6VlIwworS7U9LCpT4QcQXmFlsLdS4uZ",
 }
 
 DOCTOR_REVIEWS = {
@@ -81,7 +81,7 @@ def _format_doctor(d: Doctor, u: User) -> dict:
         "bio": d.bio,
         "rating": d.rating,
         "is_available": d.is_available,
-        "image": DOCTOR_IMAGES.get(u.email if u else "", "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?w=400&q=80"),
+        "image": DOCTOR_IMAGES.get(u.email if u else "", "https://lh3.googleusercontent.com/aida-public/AB6AXuCeSntqcAIlZ-Abr2lTid8uZE38mwRK0kAKdNOJBzCNABbLHRWaWAxcOdC657_rG6lQ0aH8P9TG2gytBsfd3TaArn5vVbxJgfmdAiC8Ggk22RSdvGbUANCYiVtP_iMXNnsYcmRlYFKgYF4HP3dQrx7--bpbiQQazzLGy48z4o6suE0YkMUvLaBWvjxCxrp3ZeinKMzTCEWPJW4UAnZMKUYw3ipCD-UhAE4rZ3MX9lo5KIXPh6VlIwworS7U9LCpT4QcQXmFlsLdS4uZ"),
         "reviews": DOCTOR_REVIEWS.get(u.email if u else "", 0),
     }
 
@@ -337,8 +337,14 @@ async def set_doctor_schedule(
     doctor_id: int,
     entries: List[ScheduleEntry],
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_roles("ADMIN")),
+    current_user: User = Depends(require_roles("ADMIN", "DOCTOR")),
 ):
+    # Doctors can only update their own schedule
+    if current_user.role == "DOCTOR":
+        doc_res = await db.execute(select(Doctor).where(Doctor.user_id == current_user.id))
+        doctor = doc_res.scalar_one_or_none()
+        if not doctor or doctor.id != doctor_id:
+            raise HTTPException(status_code=403, detail="Not authorized to update this schedule")
     existing = await db.execute(select(DoctorSchedule).where(DoctorSchedule.doctor_id == doctor_id))
     for s in existing.scalars().all():
         await db.delete(s)
