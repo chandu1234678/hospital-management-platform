@@ -29,3 +29,5 @@ frontend/dist/
 
 # Docker
 docker-compose.override.yml
+
+File cloudflared.exe
